@@ -19,11 +19,25 @@ if (!document.querySelector('link[href*="fonts.googleapis"]')) {
 function isTrialActive(user) {
   const trialEnd = user?.user_metadata?.trial_end;
   if (!trialEnd) return false;
-  return new Date(trialEnd) >= new Date();
+
+  const now = new Date();
+  const end = new Date(trialEnd);
+
+  return end > now;
 }
 
 function isSubscribed(user) {
-  return user?.user_metadata?.subscription_status === 'active';
+  const status = user?.user_metadata?.subscription_status === 'active';
+  const expiry = user?.user_metadata?.subscription_expiry;
+  if (!status || !expiry) return false;
+  return new Date(expiry) >= new Date();
+}
+
+function getDaysRemaining(expiryDate) {
+  if (!expiryDate) return 0;
+  const diff = new Date(expiryDate) - new Date();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return days > 0 ? days : 0;
 }
 
 function getPlan(user) {
@@ -46,6 +60,12 @@ const [editForm, setEditForm] = useState({
   phone: "",
   plan: ""
 });
+function getDaysRemaining(expiryDate) {
+  if (!expiryDate) return 0;
+  const diff = new Date(expiryDate) - new Date();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return days > 0 ? days : 0;
+}
 
   // Fetch data function
   async function fetchData() {
@@ -136,25 +156,35 @@ const [editForm, setEditForm] = useState({
     // const { order_id } = await orderRes.json();
 
     const options = {
-      key: 'rzp_test_SJz8d0Qkh1gVR9',
+      key: 'rzp_live_SKT6F1FqNlkl57',
       amount: price * 100,
       currency: 'INR',
       name: 'Gym Manager',
       description: `${plan} Subscription`,
       // order_id: order_id, // Uncomment after backend implementation
-      handler: async (response) => {
-        await supabase.auth.updateUser({
-          data: {
-            subscription_status: 'active',
-            plan,
-            subscribed_at: new Date().toISOString(),
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
-          },
-        });
-        window.location.reload();
-      },
+   // handlePlanSelect ke handler function ke andar:
+handler: async (response) => {
+  // Plan ke hisaab se din calculate karein
+  let durationDays = 30; 
+  if (plan === '6 Months') durationDays = 180;
+  if (plan === 'Annual') durationDays = 365;
+
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+  await supabase.auth.updateUser({
+    data: {
+      subscription_status: 'active',
+      plan,
+      subscribed_at: new Date().toISOString(),
+      subscription_expiry: expiryDate.toISOString(), // Yeh line zaroori hai
+      razorpay_payment_id: response.razorpay_payment_id,
+      razorpay_order_id: response.razorpay_order_id,
+      razorpay_signature: response.razorpay_signature,
+    },
+  });
+  window.location.reload();
+},
       prefill: {
         name: user?.user_metadata?.full_name || '',
         email: user?.email || '',
@@ -286,6 +316,20 @@ const handleEditMember = (member) => {
     });
 };
 
+// WhatsApp Reminder
+const sendWhatsAppReminder = (member) => {
+  if (!member.phone) {
+    alert("Phone number not available");
+    return;
+  }
+
+  const message = `Hello ${member.name}, your gym membership is expiring on ${member.expiry_date}. Please renew soon. - ${gymName}`;
+  
+  const url = `https://wa.me/91${member.phone}?text=${encodeURIComponent(message)}`;
+  
+  window.open(url, "_blank");
+};
+
   return (
     <div className="dashboard-root" style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#f6f8fb', color: '#1e293b', fontFamily: '"Inter", sans-serif' }}>
       {/* Sidebar */}
@@ -316,15 +360,44 @@ const handleEditMember = (member) => {
         {loading && <p style={{ textAlign: 'center' }}>Loading data...</p>}
 
         {activeTab === 'Dashboard' && (
-          <div>
-            <h2 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px', color: '#1e293b', fontFamily: '"Poppins", sans-serif' }}>Welcome, {gymName}</h2>
-            <p style={{ color: '#64748b', marginBottom: '40px', fontSize: '16px' }}>Dashboard overview and key metrics.</p>
-            {subscribed && (
-              <div style={{ background: '#e0e7ff', color: '#3730a3', borderRadius: 10, padding: '18px 24px', marginBottom: 32, fontWeight: 600, fontSize: 17, boxShadow: '0 2px 8px rgba(139,92,246,0.08)' }}>
-                <span role="img" aria-label="star">⭐</span> You are a <b>Pro</b> member! Enjoy all premium features.
-              </div>
-            )}
+  <div>
+    <h2 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px', color: '#1e293b', fontFamily: '"Poppins", sans-serif' }}>Welcome, {gymName}</h2>
+    
+    {/* Naya Subscription Widget */}
+    {subscribed && (
+      <div style={{ 
+        background: 'linear-gradient(105deg, #e0e7ff 0%, #ede9fe 100%)', 
+        color: '#3730a3', 
+        borderRadius: 14, 
+        padding: '20px 24px', 
+        marginBottom: 32, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        boxShadow: '0 4px 15px rgba(99, 102, 241, 0.1)',
+        borderLeft: '5px solid #6366f1'
+      }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>
+            <span role="img" aria-label="crown">👑</span> Pro Plan Active ({plan})
+          </div>
+          <div style={{ fontSize: 14, opacity: 0.8, marginTop: 4 }}>
+            Aapke paas sabhi premium features ka access hai.
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: '#4f46e5' }}>
+            {getDaysRemaining(user?.user_metadata?.subscription_expiry)} Days
+          </div>
+          <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Remaining
+          </div>
+        </div>
+      </div>
+    )}
             {/* Metrics */}
+            <p style={{ color: '#64748b', marginBottom: '40px', fontSize: '16px' }}>Dashboard overview and key metrics.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px' }}>
               <div style={{...s.card, borderLeft: '4px solid #8b5cf6'}}>
                 <h4 style={{margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px'}}>Total Revenue</h4>
@@ -425,6 +498,21 @@ const handleEditMember = (member) => {
   >
     Edit
   </button>
+
+  <button
+  onClick={() => sendWhatsAppReminder(m)}
+  style={{
+    background: '#25D366',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '4px 10px',
+    cursor: 'pointer',
+    fontWeight: 600
+  }}
+>
+  WhatsApp
+</button>
 
   {/* Delete */}
   <Trash2
