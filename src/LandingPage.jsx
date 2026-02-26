@@ -21,7 +21,7 @@ export default function LandingPage({ onGetStarted }) {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const plans = [
-    { name: "Free Trial", price: "0", note: "14 Days Full Access" },
+    { name: "Free Trial", price: "0", note: "7 Days Full Access" },
     { name: "Monthly", price: "499", note: "Flexible Monthly billing" },
     { name: "6 Months", price: "2599", note: "Save 15% - Most Popular", popular: true },
     { name: "Annual", price: "4599", note: "Save 25% - Best Value" },
@@ -41,7 +41,7 @@ export default function LandingPage({ onGetStarted }) {
           <nav className="landing-nav">
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
-            <button className="btn-get-started" onClick={onGetStarted}>Get Started</button>
+            <button type="button" className="btn-get-started" onClick={onGetStarted}>Get Started</button>
           </nav>
         </div>
       </header>
@@ -50,7 +50,7 @@ export default function LandingPage({ onGetStarted }) {
         <div className="container">
           <div className="hero-tag">All-in-one Management</div>
           <h1>
-            <span style={{color:'#8b5cf6'}}>Modern Gym</span> Management<br/>
+            <span className="gradient-text">Modern Gym</span> Management<br/>
             <span style={{fontWeight:700}}>Simplified.</span>
           </h1>
           <p style={{fontSize:'1.3rem',maxWidth:600,margin:'20px auto 40px'}}>Manage members, record payments, and send automatic WhatsApp reminders. Built for growth.</p>
@@ -84,7 +84,9 @@ export default function LandingPage({ onGetStarted }) {
               <div key={i} className={`pricing-card ${p.popular ? 'featured' : ''}`}>
                 {p.popular && <span className="popular-label">Popular Choice</span>}
                 <h3>{p.name}</h3>
-                <div className="price">₹{p.price}</div>
+                <div className="price">
+  {p.price === "0" ? "Free" : `₹${Number(p.price).toLocaleString("en-IN")}`}
+</div>
                 <p className="note">{p.note}</p>
                 <button 
                   className={p.popular ? "btn-plan-primary" : "btn-plan-outline"} 

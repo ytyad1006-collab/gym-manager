@@ -5,7 +5,6 @@ import LandingPage from "./LandingPage";
 import AddMemberModal from "./AddMemberModal";
 import RecordPaymentModal from "./RecordPaymentModal";
 import { Search, Trash2, LayoutDashboard, Users, CreditCard, LogOut } from "lucide-react";
-import { sendExpiryEmail } from './emailjsHelper';
 
 // Load Google Fonts
 if (!document.querySelector('link[href*="fonts.googleapis"]')) {
@@ -45,6 +44,7 @@ function getPlan(user) {
 }
 
 export default function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
   const [session, setSession] = useState(null);
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -55,17 +55,9 @@ export default function App() {
   const [searchPayments, setSearchPayments] = useState("");
   const [loading, setLoading] = useState(false);
   const [editMember, setEditMember] = useState(null);
-const [editForm, setEditForm] = useState({
-  name: "",
-  phone: "",
-  plan: ""
-});
-function getDaysRemaining(expiryDate) {
-  if (!expiryDate) return 0;
-  const diff = new Date(expiryDate) - new Date();
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-  return days > 0 ? days : 0;
-}
+  const [editForm, setEditForm] = useState({ name: "", phone: "", plan: "" });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
 
   // Fetch data function
   async function fetchData() {
@@ -138,6 +130,15 @@ function getDaysRemaining(expiryDate) {
     return 'Free';
   }
 
+  useEffect(() => {
+  const handleResize = () => {
+    setIsMobile(window.innerWidth < 768);
+  };
+
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
+
   // Plan selection handler (with Razorpay)
   async function handlePlanSelect(plan, price) {
     const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
@@ -177,7 +178,7 @@ handler: async (response) => {
       subscription_status: 'active',
       plan,
       subscribed_at: new Date().toISOString(),
-      subscription_expiry: expiryDate.toISOString(), // Yeh line zaroori hai
+      subscription_expiry: expiryDate.toISOString(),
       razorpay_payment_id: response.razorpay_payment_id,
       razorpay_order_id: response.razorpay_order_id,
       razorpay_signature: response.razorpay_signature,
@@ -279,12 +280,6 @@ handler: async (response) => {
         fetchData();
       }
     }
-       const [editMember, setEditMember] = useState(null);
-const [editForm, setEditForm] = useState({
-  name: "",
-  phone: "",
-  plan: ""
-});
   };
 
   // Paid/Unpaid toggle handler
@@ -301,16 +296,24 @@ const handleTogglePaid = async (member) => {
 // Edit Member handler
 const handleEditMember = (member) => {
   const newName = prompt("Enter new name:", member.name);
-  if (!newName) return;
+  if (newName === null) return; 
 
+  const newNumber = prompt("Enter new number:", member.number);
+  if (newNumber === null) return;
+
+  // Supabase update query
   supabase
     .from("members")
-    .update({ name: newName })
+    .update({ 
+      name: newName, 
+      number: newNumber 
+    })
     .eq("id", member.id)
     .then(({ error }) => {
       if (error) {
         alert("Error updating member: " + error.message);
       } else {
+        alert("Member updated successfully!");
         fetchData();
       }
     });
@@ -333,8 +336,44 @@ const sendWhatsAppReminder = (member) => {
   return (
     <div className="dashboard-root" style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#f6f8fb', color: '#1e293b', fontFamily: '"Inter", sans-serif' }}>
       {/* Sidebar */}
-      <div className="sidebar" style={{ width: '260px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', padding: '30px 20px', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 30px rgba(139, 92, 246, 0.15)' }}>
+      <div
+  style={{
+    width: "260px",
+    background: "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
+    padding: "30px 20px",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 10px 30px rgba(139, 92, 246, 0.15)",
+    position: isMobile ? "fixed" : "relative",
+    left: isMobile ? (mobileMenuOpen ? "0" : "-260px") : "0",
+    top: 0,
+    height: "100vh",
+    transition: "left 0.3s ease",
+    zIndex: 1000,
+  }}
+>
         <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '40px', color: '#fff', fontFamily: '"Poppins", sans-serif', letterSpacing: '-0.5px' }}>{gymName.toUpperCase()}</h1>
+        {isMobile && (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "15px 20px",
+      background: "#8b5cf6",
+      color: "#fff",
+    }}
+  >
+    <div style={{ fontWeight: 600 }}>{gymName}</div>
+
+    <div
+      onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      style={{ cursor: "pointer", fontSize: "22px" }}
+    >
+      ☰
+    </div>
+  </div>
+)}
         {/* Current plan display */}
         <div style={{ color: '#fff', fontWeight: 500, marginBottom: 18, fontSize: 15, background: 'rgba(139,92,246,0.18)', borderRadius: 8, padding: '8px 16px', display: 'inline-block' }}>
           Current Plan: <span style={{ fontWeight: 700 }}>{getPlanDisplay()}</span>
@@ -355,15 +394,34 @@ const sendWhatsAppReminder = (member) => {
         <button onClick={() => supabase.auth.signOut()} style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '10px', color: '#fff', border: 'none', background: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontWeight: '600', padding: '12px 15px', borderRadius: '10px', transition: 'all 0.3s', fontSize: '15px' }} onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.3)'} onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}><LogOut size={20} /> Logout</button>
       </div>
 
+      {window.innerWidth < 768 && (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '15px 20px',
+    background: '#8b5cf6',
+    color: '#fff'
+  }}>
+    <div style={{ fontWeight: 600 }}>{gymName}</div>
+
+    <div
+      onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      style={{ cursor: 'pointer', fontSize: '22px' }}
+    >
+      ☰
+    </div>
+  </div>
+)}
+
       {/* Main Content */}
-      <div className="main-content" style={{ flex: 1, padding: '40px 50px', overflowY: 'auto', backgroundColor: '#f6f8fb' }}>
+      <div className="main-content" style={{ flex: 1, padding: window.innerWidth < 768 ? '20px' : '40px 50px', overflowY: 'auto', backgroundColor: '#f6f8fb' }}>
         {loading && <p style={{ textAlign: 'center' }}>Loading data...</p>}
 
         {activeTab === 'Dashboard' && (
   <div>
     <h2 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px', color: '#1e293b', fontFamily: '"Poppins", sans-serif' }}>Welcome, {gymName}</h2>
     
-    {/* Naya Subscription Widget */}
     {subscribed && (
       <div style={{ 
         background: 'linear-gradient(105deg, #e0e7ff 0%, #ede9fe 100%)', 
@@ -382,7 +440,6 @@ const sendWhatsAppReminder = (member) => {
             <span role="img" aria-label="crown">👑</span> Pro Plan Active ({plan})
           </div>
           <div style={{ fontSize: 14, opacity: 0.8, marginTop: 4 }}>
-            Aapke paas sabhi premium features ka access hai.
           </div>
         </div>
         
@@ -730,7 +787,12 @@ const s = {
   blankInput: { border: 'none', outline: 'none', marginLeft: '10px', width: '100%', fontSize: '15px', backgroundColor: 'transparent', color: '#1e293b', fontFamily: '"Inter", sans-serif' },
   primaryBtn: { backgroundColor: '#8b5cf6', color: '#fff', padding: '12px 28px', borderRadius: '10px', border: 'none', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)', transition: 'all 0.3s', fontSize: '15px' },
   successBtn: { backgroundColor: '#10b981', color: '#fff', padding: '12px 28px', borderRadius: '10px', border: 'none', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', transition: 'all 0.3s', fontSize: '15px' },
-  tableContainer: { backgroundColor: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
+  tableContainer: {
+  backgroundColor: '#fff',
+  borderRadius: '16px',
+  overflowX: 'auto',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.08)'
+},
   table: { width: '100%', borderCollapse: 'collapse', fontFamily: '"Inter", sans-serif' },
   tableHead: { textAlign: 'left', backgroundColor: '#f1f5f9', height: '55px', borderBottom: '2px solid #e2e8f0', fontSize: '13px', color: '#475569', paddingLeft: '20px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' },
   tableRow: { borderBottom: '1px solid #f1f5f9', height: '60px', transition: 'all 0.2s' },
