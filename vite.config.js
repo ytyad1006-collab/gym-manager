@@ -5,14 +5,21 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Isse Vite ko pata chal jayega ki react-is kahan se uthana hai
+      // React 19 mein react-is ka rasta saaf karne ke liye
       'react-is': 'react-is',
     },
   },
+  optimizeDeps: {
+    include: ['recharts', 'react-is'],
+  },
   build: {
     rollupOptions: {
-      // Isse Rollup ko force karenge ki react-is ko bundle mein shamil kare
-      external: [],
+      output: {
+        manualChunks: {
+          // Recharts ko alag se bundle karega taaki dependency error na aaye
+          recharts: ['recharts'],
+        },
+      },
     },
   },
 })
