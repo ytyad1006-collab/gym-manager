@@ -58,25 +58,25 @@ function MembershipPlans() {
   }
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl shadow-slate-100 border border-slate-100 animate-in fade-in duration-500">
+    <div className="bg-white p-4 md:p-8 rounded-[24px] md:rounded-3xl shadow-xl shadow-slate-100 border border-slate-100 animate-in fade-in duration-500 max-w-7xl mx-auto">
       {/* Header Section */}
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 md:mb-10">
         <div>
-          <h3 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight">Membership Plans</h3>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Configure your gym packages</p>
+          <h3 className="text-xl md:text-2xl font-black text-slate-800 italic uppercase tracking-tight leading-none">Membership Plans</h3>
+          <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Configure your gym packages</p>
         </div>
         <button 
           onClick={() => setShowForm(!showForm)} 
-          className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg active:scale-95 ${showForm ? 'bg-slate-100 text-slate-600' : 'bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700'}`}
+          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 ${showForm ? 'bg-slate-100 text-slate-600' : 'bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700'}`}
         >
-          {showForm ? <X size={18} /> : <Plus size={18} />} 
+          {showForm ? <X size={16} /> : <Plus size={16} />} 
           {showForm ? "Cancel" : "Create Plan"}
         </button>
       </div>
 
       {/* Add Plan Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10 p-6 bg-slate-50 rounded-[24px] border-2 border-dashed border-slate-200 animate-in slide-in-from-top-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 p-5 md:p-6 bg-slate-50 rounded-[24px] border-2 border-dashed border-slate-200 animate-in slide-in-from-top-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Plan Name</label>
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="Silver, Gold, etc." value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -90,7 +90,7 @@ function MembershipPlans() {
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" placeholder="Amount" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
           </div>
           <div className="flex items-end">
-            <button disabled={loading} className="w-full bg-slate-900 text-white rounded-xl py-3.5 font-black uppercase text-xs tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2">
+            <button disabled={loading} className="w-full bg-slate-900 text-white rounded-xl py-3.5 font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200">
               {loading ? <Loader2 className="animate-spin" size={18} /> : <><Save size={16}/> Save Plan</>}
             </button>
           </div>
@@ -100,44 +100,44 @@ function MembershipPlans() {
       {/* Plans List */}
       <div className="grid grid-cols-1 gap-4">
         {plans.length > 0 ? plans.map((plan) => (
-          <div key={plan.id} className="group flex flex-wrap justify-between items-center p-5 border border-slate-100 rounded-[24px] bg-white hover:border-blue-200 hover:shadow-xl hover:shadow-blue-50/50 transition-all">
-            <div className="flex items-center gap-5">
-              <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-blue-600 transition-colors">
-                <Layers size={20} />
+          <div key={plan.id} className="group flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 border border-slate-100 rounded-[20px] md:rounded-[24px] bg-white hover:border-blue-200 hover:shadow-xl hover:shadow-blue-50/50 transition-all gap-4">
+            <div className="flex items-center gap-4 md:gap-5">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 text-white rounded-lg md:rounded-2xl flex items-center justify-center shadow-lg group-hover:bg-blue-600 transition-colors shrink-0">
+                <Layers size={18} mdSize={20} />
               </div>
               <div>
-                <p className="font-black text-slate-800 text-lg italic uppercase">{plan.name}</p>
-                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-tighter">
+                <p className="font-black text-slate-800 text-base md:text-lg italic uppercase leading-tight">{plan.name}</p>
+                <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] md:text-xs uppercase tracking-tighter mt-0.5">
                   <Clock size={12} /> {plan.duration_months} Months Duration
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-6 mt-4 md:mt-0">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">Price</span>
-                <span className="text-2xl font-black text-blue-600 italic flex items-center tracking-tighter">
-                  <IndianRupee size={18} strokeWidth={3} />{plan.price.toLocaleString()}
+            <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-4 md:gap-6 border-t md:border-t-0 pt-4 md:pt-0">
+              <div className="flex flex-col items-start md:items-end">
+                <span className="text-[9px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">Price</span>
+                <span className="text-xl md:text-2xl font-black text-blue-600 italic flex items-center tracking-tighter">
+                  <IndianRupee size={16} mdSize={18} strokeWidth={3} />{plan.price.toLocaleString()}
                 </span>
               </div>
               
-              <div className="flex bg-slate-50 p-1.5 rounded-2xl gap-1">
-                <button onClick={() => { setSelectedPlan(plan); setModalType('view'); }} className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all" title="View Details">
-                  <Eye size={20}/>
+              <div className="flex bg-slate-50 p-1 rounded-xl md:rounded-2xl gap-0.5 md:gap-1">
+                <button onClick={() => { setSelectedPlan(plan); setModalType('view'); }} className="p-2 md:p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg md:rounded-xl transition-all" title="View Details">
+                  <Eye size={18}/>
                 </button>
-                <button onClick={() => { setSelectedPlan(plan); setModalType('edit'); }} className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-xl transition-all" title="Edit Plan">
-                  <Edit2 size={18}/>
+                <button onClick={() => { setSelectedPlan(plan); setModalType('edit'); }} className="p-2 md:p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg md:rounded-xl transition-all" title="Edit Plan">
+                  <Edit2 size={16}/>
                 </button>
-                <button onClick={() => handleDelete(plan.id)} className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl transition-all" title="Delete Plan">
-                  <Trash2 size={20}/>
+                <button onClick={() => handleDelete(plan.id)} className="p-2 md:p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg md:rounded-xl transition-all" title="Delete Plan">
+                  <Trash2 size={18}/>
                 </button>
               </div>
             </div>
           </div>
         )) : (
-          <div className="text-center py-20 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
-             <Layers className="mx-auto text-slate-200 mb-4" size={48} />
-             <p className="text-slate-400 font-black uppercase text-xs tracking-[0.2em]">No membership plans created yet</p>
+          <div className="text-center py-16 md:py-20 bg-slate-50 rounded-[24px] md:rounded-[32px] border-2 border-dashed border-slate-200">
+             <Layers className="mx-auto text-slate-200 mb-4" size={40} mdSize={48} />
+             <p className="px-4 text-slate-400 font-black uppercase text-[10px] md:text-xs tracking-[0.2em]">No membership plans created yet</p>
           </div>
         )}
       </div>
@@ -145,30 +145,30 @@ function MembershipPlans() {
       {/* Modern Modal Section */}
       {modalType && selectedPlan && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl relative animate-in zoom-in-95 duration-300">
-            <button onClick={() => setModalType(null)} className="absolute right-6 top-6 p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-all"><X size={20}/></button>
+          <div className="bg-white rounded-[32px] md:rounded-[40px] w-full max-w-md p-6 md:p-8 shadow-2xl relative animate-in zoom-in-95 duration-300">
+            <button onClick={() => setModalType(null)} className="absolute right-4 md:right-6 top-4 md:top-6 p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-all"><X size={20}/></button>
             
-            <div className="flex items-center gap-3 mb-8">
+            <div className="flex items-center gap-3 mb-6 md:mb-8 mt-2">
                <div className={`p-3 rounded-2xl ${modalType === 'edit' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
                   {modalType === 'edit' ? <Edit2 size={24}/> : <Eye size={24}/>}
                </div>
-               <h2 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight">{modalType} Plan</h2>
+               <h2 className="text-xl md:text-2xl font-black text-slate-800 italic uppercase tracking-tight">{modalType} Plan</h2>
             </div>
 
-            <form onSubmit={handleUpdate} className="space-y-6">
+            <form onSubmit={handleUpdate} className="space-y-5 md:space-y-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Plan Name</label>
-                <input disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all" value={selectedPlan.name} onChange={(e) => setSelectedPlan({...selectedPlan, name: e.target.value})} />
+                <input disabled={modalType === 'view'} className="w-full p-3 md:p-4 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all" value={selectedPlan.name} onChange={(e) => setSelectedPlan({...selectedPlan, name: e.target.value})} />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (Months)</label>
-                  <input type="number" disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all" value={selectedPlan.duration_months} onChange={(e) => setSelectedPlan({...selectedPlan, duration_months: e.target.value})} />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Months</label>
+                  <input type="number" disabled={modalType === 'view'} className="w-full p-3 md:p-4 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all" value={selectedPlan.duration_months} onChange={(e) => setSelectedPlan({...selectedPlan, duration_months: e.target.value})} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price (₹)</label>
-                  <input type="number" disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all text-blue-600" value={selectedPlan.price} onChange={(e) => setSelectedPlan({...selectedPlan, price: e.target.value})} />
+                  <input type="number" disabled={modalType === 'view'} className="w-full p-3 md:p-4 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-600 font-bold transition-all text-blue-600" value={selectedPlan.price} onChange={(e) => setSelectedPlan({...selectedPlan, price: e.target.value})} />
                 </div>
               </div>
               

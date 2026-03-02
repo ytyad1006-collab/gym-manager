@@ -132,7 +132,7 @@ export default function Support() {
 
       {/* Footer Info */}
       <p className="text-center text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
-        Powered by Satish Yadav &bull; Version 2.0
+        Powered by GYM Manager India &bull; Version 2.0
       </p>
     </div>
   );

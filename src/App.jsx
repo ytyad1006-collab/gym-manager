@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute.jsx"; 
 
-import LandingPage from "./pages/LandingPage.jsx"; // ✅ Landing Page Import Kiya
+import LandingPage from "./pages/LandingPage.jsx"; 
 import Dashboard from "./pages/Dashboard.jsx";
 import Member from "./pages/members-page/Member.jsx";
 import AddMember from "./member/AddMember.jsx"; 
@@ -21,13 +21,20 @@ import SetupLayout from "./pages/setup/SetupLayout.jsx";
 import MembershipPlans from "./pages/setup/MembershipPlans.jsx";
 import Trainers from "./pages/setup/Trainers.jsx";
 
+// ✅ Naya Import: Legal Pages ke liye
+import LegalPages from "./pages/LegalPages.jsx"; 
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* --- Public Routes --- */}
-        <Route path="/" element={<LandingPage />} /> {/* ✅ Landing Page ab Main Path par hai */}
+        <Route path="/" element={<LandingPage />} /> 
         <Route path="/login" element={<Login />} />
+        
+        {/* ✅ Naye Public Routes: Privacy aur Terms ke liye */}
+        <Route path="/privacy" element={<LegalPages type="privacy" />} />
+        <Route path="/terms" element={<LegalPages type="terms" />} />
 
         {/* --- Protected Routes (Sirf Login ke baad) --- */}
         <Route element={<ProtectedRoute />}>
