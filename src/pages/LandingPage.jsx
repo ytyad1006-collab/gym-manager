@@ -162,7 +162,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto pt-12 border-t border-slate-100 text-center">
-            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">© 2026 GYMPRO SOFTWARE. ALL RIGHTS RESERVED.</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">© 2026 GYMMANAGERINDIA SOFTWARE. ALL RIGHTS RESERVED.</p>
         </div>
       </footer>
 
