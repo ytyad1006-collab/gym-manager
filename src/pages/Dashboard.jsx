@@ -144,7 +144,8 @@ function Dashboard() {
   const activePercentage = stats.totalMembers > 0 ? Math.round((activeCount / stats.totalMembers) * 100) : 0;
 
   return (
-    <div className="space-y-8 pb-10 animate-page px-4 md:px-0">
+    <div className="space-y-8 pb-10 animate-page px-2 md:px-0">
+      
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-100 pb-6">
         <div>
@@ -152,26 +153,26 @@ function Dashboard() {
             <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-50">
               {greeting.icon}
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 tracking-tight italic uppercase">
+            <h2 className="text-xl md:text-3xl font-bold text-slate-900 tracking-tight italic uppercase">
               {greeting.text}, <span className="text-blue-600">{gymName}</span>
             </h2>
           </div>
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-widest ml-1">
+          <p className="text-[9px] md:text-xs text-slate-400 font-medium uppercase tracking-widest ml-1">
             System Status: <span className="text-emerald-500 font-semibold">Operational</span> • {new Date().toLocaleDateString('en-GB')}
           </p>
         </div>
         
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
           <button 
             onClick={() => navigate("/suggestions")}
-            className="flex items-center gap-2 bg-white text-amber-600 py-2.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-amber-50 transition-all border border-amber-100 shadow-sm"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-amber-600 py-2.5 px-4 rounded-xl text-[10px] md:text-xs font-semibold uppercase tracking-wider hover:bg-amber-50 transition-all border border-amber-100 shadow-sm"
           >
             <Lightbulb size={14} className="fill-amber-500/20" /> Suggest
           </button>
 
           <button 
             onClick={() => navigate("/members/add")}
-            className="flex items-center gap-2 bg-slate-900 text-white py-2.5 px-5 rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-blue-600 transition-all shadow-md active:scale-95"
+            className="flex-[2] md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white py-2.5 px-5 rounded-xl text-[10px] md:text-xs font-semibold uppercase tracking-wider hover:bg-blue-600 transition-all shadow-md active:scale-95"
           >
             <PlusCircle size={14} /> Add Member
           </button>
@@ -186,7 +187,7 @@ function Dashboard() {
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <StatCard title="Today's Cash" value={`₹${stats.todayCollection}`} color="bg-emerald-500" />
         <StatCard title="This Month" value={`₹${stats.thisMonthRevenue}`} color="bg-blue-600" />
         <StatCard title="Life Revenue" value={`₹${stats.totalRevenue}`} color="bg-slate-900" />
@@ -200,40 +201,40 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* GRAPH SECTION - Adjusted to 3 cols for better width */}
-        <div className="lg:col-span-3 space-y-6">
-            <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm relative overflow-hidden">
+        {/* GRAPH SECTION - Desktop pe 3/4 area occupy karega */}
+        <div className="lg:col-span-3 space-y-6 w-full min-w-0">
+            <div className="bg-white p-4 md:p-6 rounded-[24px] border border-slate-100 shadow-sm relative overflow-hidden flex flex-col h-full">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-emerald-500"></div>
               
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                     <TrendingUp size={20} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 uppercase tracking-tight italic text-xl">Revenue Analytics</h3>
+                    <h3 className="font-bold text-slate-900 uppercase tracking-tight italic text-lg md:text-xl">Revenue Analytics</h3>
                     <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">Last 6 Months Trends</p>
                   </div>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-100">
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg border border-emerald-100">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                  <span className="text-[9px] font-bold uppercase tracking-widest">Live</span>
+                  <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest">Live</span>
                 </div>
               </div>
 
-              {/* Chart Container Fix: Dynamic height and overflow control */}
-              <div className="w-full min-h-[350px] bg-slate-50/20 rounded-xl p-2">
+              {/* ✅ Fixed Chart Container: Isko height aur width explicit di hai */}
+              <div className="w-full flex-1 min-h-[320px] md:min-h-[400px] bg-slate-50/20 rounded-xl p-2 relative">
                 <RevenueChart data={monthlyData} />
               </div>
             </div>
 
             {/* Retention Bar Section */}
-            <div className="bg-slate-900 rounded-[24px] p-8 text-white flex flex-col md:flex-row items-center gap-8 relative overflow-hidden shadow-lg">
+            <div className="bg-slate-900 rounded-[24px] p-6 md:p-8 text-white flex flex-col md:flex-row items-center gap-6 md:gap-8 relative overflow-hidden shadow-lg">
                <div className="flex-1 relative z-10 w-full">
                  <div className="flex items-center gap-2 mb-1">
                     <Users size={16} className="text-blue-400" />
-                    <h4 className="text-xl font-bold italic uppercase tracking-tight">Member Retention</h4>
+                    <h4 className="text-lg md:text-xl font-bold italic uppercase tracking-tight">Member Retention</h4>
                  </div>
                  <p className="text-slate-400 text-xs mb-6 font-medium">
                     <span className="text-white font-semibold">{activeCount}</span> loyal members out of <span className="text-white font-semibold">{stats.totalMembers}</span>.
@@ -252,9 +253,9 @@ function Dashboard() {
             </div>
         </div>
 
-        {/* SIDEBAR - Adjusted to 1 col */}
-        <div className="lg:col-span-1 h-full">
-            <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden h-full min-h-[500px]">
+        {/* SIDEBAR - Recent Activity */}
+        <div className="lg:col-span-1 w-full">
+            <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden min-h-[400px] lg:h-full">
                 <RecentActivity payments={recentPayments} onViewAll={() => navigate("/members/payments")} />
             </div>
         </div>

@@ -18,14 +18,15 @@ function RevenueChart({ data }) {
         Monthly Revenue
       </h3>
 
-      <div className="w-full h-[350px] min-h-[300px]"> 
-        {/* Height ko fixed ya min-height dena zaroori hai ResponsiveContainer ke liye */}
+      {/* ✅ Fixed height container for ResponsiveContainer */}
+      <div className="w-full h-[350px] min-h-[300px] relative"> 
         {safeData.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
             <p className="text-slate-400">No revenue data available</p>
           </div>
         ) : (
-          <ResponsiveContainer width="99%" height="100%">
+          /* ✅ Added minWidth={0} and minHeight={0} to stop the console warning */
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <LineChart 
               data={safeData} 
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -64,6 +65,8 @@ function RevenueChart({ data }) {
                 dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
                 animationDuration={1500}
+                /* ✅ ConnectNulls ensures line doesn't break if a month has 0 data */
+                connectNulls={true}
               />
             </LineChart>
           </ResponsiveContainer>

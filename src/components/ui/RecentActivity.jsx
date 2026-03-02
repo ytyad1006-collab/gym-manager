@@ -4,7 +4,7 @@ import { History, User } from 'lucide-react';
 // Props mein onViewAll add kiya hai button activate karne ke liye
 const RecentActivity = ({ payments = [], onViewAll }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full">
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <h3 className="font-bold text-slate-800 flex items-center gap-2">
           <History size={18} className="text-blue-600" />
@@ -14,8 +14,9 @@ const RecentActivity = ({ payments = [], onViewAll }) => {
 
       <div className="divide-y divide-slate-50">
         {payments.length > 0 ? (
-          payments.map((p) => (
-            <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors">
+          payments.map((p, index) => (
+            /* ✅ Unique key error fix: p.id ke saath index bhi rakha hai safety ke liye */
+            <div key={p.id || index} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
@@ -44,11 +45,11 @@ const RecentActivity = ({ payments = [], onViewAll }) => {
         )}
       </div>
 
-      <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
+      <div className="p-3 bg-slate-50 border-t border-slate-100 text-center mt-auto">
         {/* Button par onClick event add kar diya gaya hai */}
         <button 
           onClick={onViewAll} 
-          className="text-xs font-bold text-blue-600 hover:text-blue-700 w-full"
+          className="text-xs font-bold text-blue-600 hover:text-blue-700 w-full transition-all active:scale-95"
         >
           View All Transactions
         </button>
