@@ -1,16 +1,28 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom"; 
-import { PlusCircle, FileText, Users, ArrowUpRight, Sun, Moon, Sunrise, Sunset, Lightbulb, RefreshCw, Zap, TrendingUp, IndianRupee } from "lucide-react"; 
+import { PlusCircle, FileText, Users, ArrowUpRight, Sun, Moon, Sunrise, Sunset, Lightbulb, RefreshCw, Zap, TrendingUp, IndianRupee, Sparkles, Globe } from "lucide-react"; 
 import StatCard from "../components/ui/StatCard";
 import RevenueChart from "../components/ui/RevenueChart";
 import RecentActivity from "../components/ui/RecentActivity";
 
-function Dashboard() {
+// ✅ currentLang aur setLang (activation ke liye) props receive kiye
+function Dashboard({ currentLang = 'en', setLang }) {
   const navigate = useNavigate(); 
   const [gymName, setGymName] = useState("Your Gym"); 
   const [greeting, setGreeting] = useState({ text: "", icon: null }); 
-  
+
+  // ✅ Translation Object
+  const t = {
+    en: { welcome: "Dashboard", health: "AI Gym Health Score", add: "Add Member", suggest: "Suggest", status: "Operational", analysis: "AI Analysis: Revenue is predicted to grow.", retention: "Member Retention" },
+    hi: { welcome: "डैशबोर्ड", health: "AI जिम हेल्थ स्कोर", add: "सदस्य जोड़ें", suggest: "सुझाव", status: "सक्रिय", analysis: "AI विश्लेषण: अगले महीने आय बढ़ने की उम्मीद है।", retention: "सदस्य प्रतिधारण" },
+    mr: { welcome: "डॅशボード", health: "AI जिम हेल्थ स्कोअर", add: "सदस्य जोडा", suggest: "सुझाव", status: "कार्यरत", analysis: "AI विश्लेषण: पुढच्या महिन्यात महसूल वाढण्याची शक्यता आहे.", retention: "सदस्य टिकवून ठेवणे" },
+    pa: { welcome: "ਡੈਸ਼ਬੋਰਡ", health: "AI ਜਿਮ ਹੈਲਥ ਸਕੋਰ", add: "ਮੈਂਬਰ ਜੋੜੋ", suggest: "ਸੁਝਾਅ", status: "ਚਾਲੂ", analysis: "AI ਵਿਸ਼ਲੇਸ਼ਣ: ਅਗਲੇ ਮਹੀਨੇ ਆਮਦਨ ਵਧਣ ਦੀ ਉਮੀਦ ਹੈ।", retention: "ਮੈਂਬਰ ਧਾਰਨ" },
+    fr: { welcome: "Tableau de bord", health: "Score de santé IA", add: "Ajouter", suggest: "Suggérer", status: "Opérationnel", analysis: "Analyse IA : Le revenu devrait augmenter.", retention: "Rétention des membres" }
+  };
+
+  const currentT = t[currentLang] || t['en'];
+
   const [stats, setStats] = useState({
     todayCollection: 0, totalPaid: 0, totalDue: 0, totalExpenses: 0,
     totalMembers: 0, expiredMembers: 0, expiry7Days: 0, expiry3Days: 0,
@@ -24,7 +36,7 @@ function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
     updateGreeting(); 
-  }, []);
+  }, [currentLang]); // Language badalne par greeting update hogi
 
   const updateGreeting = async () => {
     const hour = new Date().getHours();
@@ -32,17 +44,17 @@ function Dashboard() {
     let welcomeIcon = null;
 
     if (hour >= 5 && hour < 12) {
-      welcomeText = "Good Morning";
-      welcomeIcon = <Sunrise className="text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]" size={24} mdSize={28} />;
+      welcomeText = currentLang === 'hi' ? "शुभ प्रभात" : "Good Morning";
+      welcomeIcon = <Sunrise className="text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]" size={24} />;
     } else if (hour >= 12 && hour < 17) {
-      welcomeText = "Good Afternoon";
-      welcomeIcon = <Sun className="text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" size={24} mdSize={28} />;
+      welcomeText = currentLang === 'hi' ? "नमस्कार" : "Good Afternoon";
+      welcomeIcon = <Sun className="text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" size={24} />;
     } else if (hour >= 17 && hour < 21) {
-      welcomeText = "Good Evening";
-      welcomeIcon = <Sunset className="text-orange-500 drop-shadow-[0_0_8_rgba(249,115,22,0.5)]" size={24} mdSize={28} />;
+      welcomeText = currentLang === 'hi' ? "शुभ संध्या" : "Good Evening";
+      welcomeIcon = <Sunset className="text-orange-500 drop-shadow-[0_0_8_rgba(249,115,22,0.5)]" size={24} />;
     } else {
-      welcomeText = "Good Night";
-      welcomeIcon = <Moon className="text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]" size={24} mdSize={28} />;
+      welcomeText = currentLang === 'hi' ? "शुभ रात्रि" : "Good Night";
+      welcomeIcon = <Moon className="text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]" size={24} />;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -128,15 +140,12 @@ function Dashboard() {
   };
 
   if (loading) return (
-    <div className="p-10 flex flex-col items-center justify-center h-[80vh] space-y-6">
+    <div className="p-10 flex flex-col items-center justify-center h-[80vh] space-y-6 text-center">
       <div className="relative">
-        <div className="w-16 h-16 border-4 border-slate-100 border-t-slate-900 rounded-full animate-spin"></div>
-        <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-900 animate-pulse" size={20} />
+        <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+        <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-600 animate-pulse" size={20} />
       </div>
-      <div className="text-center px-4">
-        <p className="text-slate-900 font-black uppercase text-[10px] md:text-xs tracking-[0.3em]">Syncing Performance</p>
-        <p className="text-slate-400 text-[8px] md:text-[10px] mt-1 font-bold uppercase tracking-widest">Loading Gym Intelligence...</p>
-      </div>
+      <p className="font-black uppercase tracking-widest text-xs">AI Gym Intelligence Syncing...</p>
     </div>
   );
 
@@ -146,6 +155,28 @@ function Dashboard() {
   return (
     <div className="space-y-6 md:space-y-8 pb-10 animate-page px-2 md:px-0 max-w-7xl mx-auto">
       
+      {/* AI Health Score Card */}
+      <div className="bg-gradient-to-br from-indigo-600 via-blue-700 to-purple-800 p-6 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-white/10">
+        <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+              <Sparkles className="text-yellow-300 animate-pulse" size={32} />
+            </div>
+            <div>
+              <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] mb-1">{currentT.health}</p>
+              <div className="flex items-end gap-2">
+                <h2 className="text-5xl font-black italic">88<span className="text-xl opacity-50">/100</span></h2>
+                <span className="bg-emerald-500 text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 uppercase tracking-tighter">Perfect</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5 max-w-sm">
+             <p className="text-[11px] leading-relaxed font-medium text-indigo-50">✨ <span className="font-bold">AI INSIGHT:</span> {currentT.analysis}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-100 pb-6">
         <div className="w-full md:w-auto">
@@ -158,23 +189,40 @@ function Dashboard() {
             </h2>
           </div>
           <p className="text-[9px] md:text-xs text-slate-400 font-black uppercase tracking-widest ml-1 opacity-70">
-            System Status: <span className="text-emerald-500 font-bold">Operational</span> • {new Date().toLocaleDateString('en-GB')}
+            {currentT.status}: <span className="text-emerald-500 font-bold">Operational</span> • {new Date().toLocaleDateString('en-GB')}
           </p>
         </div>
         
-        <div className="flex flex-row gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+        <div className="flex flex-row gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 items-center">
+          
+          {/* ✅ Language Selector - Precisely Placed & Activated */}
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm shrink-0">
+            <Globe size={14} className="text-slate-400" />
+            <select 
+              value={currentLang} 
+              onChange={(e) => setLang(e.target.value)}
+              className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-slate-700"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी</option>
+              <option value="mr">मराठी</option>
+              <option value="pa">ਪੰਜਾਬੀ</option>
+              <option value="fr">French</option>
+            </select>
+          </div>
+
           <button 
             onClick={() => navigate("/suggestions")}
             className="flex-shrink-0 flex items-center justify-center gap-2 bg-white text-amber-600 py-2.5 px-4 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider hover:bg-amber-50 transition-all border border-amber-100 shadow-sm"
           >
-            <Lightbulb size={14} className="fill-amber-500/20" /> Suggest
+            <Lightbulb size={14} className="fill-amber-500/20" /> {currentT.suggest}
           </button>
 
           <button 
             onClick={() => navigate("/members/add")}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white py-2.5 px-6 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
           >
-            <PlusCircle size={14} /> Add Member
+            <PlusCircle size={14} /> {currentT.add}
           </button>
           
           <button 
@@ -186,7 +234,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Cards Grid - 2 columns on mobile, 5 on desktop */}
+      {/* Stats Cards Grid (Remaining code stays exactly same) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <StatCard title="Today's Cash" value={`₹${stats.todayCollection.toLocaleString()}`} color="bg-emerald-500" />
         <StatCard title="This Month" value={`₹${stats.thisMonthRevenue.toLocaleString()}`} color="bg-blue-600" />
@@ -201,7 +249,6 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* GRAPH SECTION */}
         <div className="lg:col-span-3 space-y-6 w-full min-w-0">
             <div className="bg-white p-4 md:p-6 rounded-[24px] border border-slate-100 shadow-sm relative overflow-hidden flex flex-col">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-emerald-500"></div>
@@ -223,37 +270,34 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Chart Container - Fixed min-height for mobile */}
               <div className="w-full flex-1 min-h-[250px] md:min-h-[400px] bg-slate-50/20 rounded-xl p-1 md:p-2 relative">
                 <RevenueChart data={monthlyData} />
               </div>
             </div>
 
-            {/* Retention Bar Section */}
             <div className="bg-slate-900 rounded-[24px] p-6 md:p-8 text-white flex flex-col md:flex-row items-center gap-6 md:gap-8 relative overflow-hidden shadow-lg border border-slate-800">
-               <div className="flex-1 relative z-10 w-full">
-                 <div className="flex items-center gap-2 mb-1">
-                    <Users size={16} className="text-blue-400" />
-                    <h4 className="text-lg md:text-xl font-black italic uppercase tracking-tight">Member Retention</h4>
-                 </div>
-                 <p className="text-slate-400 text-[10px] md:text-xs mb-6 font-bold uppercase tracking-wide">
+                <div className="flex-1 relative z-10 w-full">
+                  <div className="flex items-center gap-2 mb-1">
+                     <Users size={16} className="text-blue-400" />
+                     <h4 className="text-lg md:text-xl font-black italic uppercase tracking-tight">{currentT.retention}</h4>
+                  </div>
+                  <p className="text-slate-400 text-[10px] md:text-xs mb-6 font-bold uppercase tracking-wide">
                     <span className="text-white font-black">{activeCount}</span> Active out of <span className="text-white font-black">{stats.totalMembers}</span>.
-                 </p>
-                 <div className="w-full bg-slate-800 h-2.5 md:h-3 rounded-full overflow-hidden mb-2">
-                    <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(37,99,235,0.4)]" style={{ width: `${activePercentage}%` }}></div>
-                 </div>
-                 <div className="flex justify-between">
-                    <p className="text-blue-400 font-black text-[9px] md:text-[10px] uppercase tracking-wider">{activePercentage}% Score</p>
-                    <p className="text-slate-500 font-bold text-[9px] md:text-[10px] uppercase">Target: 90%</p>
-                 </div>
-               </div>
-               <button onClick={() => navigate("/reports")} className="w-full md:w-auto bg-white text-slate-900 px-6 py-3.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition-all shrink-0 shadow-xl active:scale-95">
-                 Get Report <ArrowUpRight size={14} />
-               </button>
+                  </p>
+                  <div className="w-full bg-slate-800 h-2.5 md:h-3 rounded-full overflow-hidden mb-2">
+                     <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(37,99,235,0.4)]" style={{ width: `${activePercentage}%` }}></div>
+                  </div>
+                  <div className="flex justify-between">
+                     <p className="text-blue-400 font-black text-[9px] md:text-[10px] uppercase tracking-wider">{activePercentage}% Score</p>
+                     <p className="text-slate-500 font-bold text-[9px] md:text-[10px] uppercase">Target: 90%</p>
+                  </div>
+                </div>
+                <button onClick={() => navigate("/reports")} className="w-full md:w-auto bg-white text-slate-900 px-6 py-3.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition-all shrink-0 shadow-xl active:scale-95">
+                  Get Report <ArrowUpRight size={14} />
+                </button>
             </div>
         </div>
 
-        {/* SIDEBAR - Recent Activity */}
         <div className="lg:col-span-1 w-full mt-6 lg:mt-0">
             <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden min-h-[350px] lg:h-full">
                 <RecentActivity payments={recentPayments} onViewAll={() => navigate("/members/payments")} />

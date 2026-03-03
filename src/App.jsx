@@ -1,3 +1,4 @@
+import React, { useState } from "react"; // ✅ Added useState for Language
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute.jsx"; 
 
@@ -21,12 +22,21 @@ import SetupLayout from "./pages/setup/SetupLayout.jsx";
 import MembershipPlans from "./pages/setup/MembershipPlans.jsx";
 import Trainers from "./pages/setup/Trainers.jsx";
 
-// ✅ Naya Import: Legal Pages ke liye
+// ✅ Naya Import: Legal Pages aur AIChatbot
 import LegalPages from "./pages/LegalPages.jsx"; 
+import AIChatbot from "./components/AIChatbot.jsx"; // 🤖 AI Chatbot Import
 
 function App() {
+  // ✅ Language State: Ab ye fully activated hai
+  const [currentLang, setCurrentLang] = useState('en');
+
   return (
     <BrowserRouter>
+      {/* 🤖 Global AI Assistant - Ab ye currentLang ke sath synced hai */}
+      <AIChatbot currentLang={currentLang} />
+      
+      {/* 🌐 Note: Maine purana floating div hata diya hai kyunki humne dropdown ko Dashboard header mein shift kar diya hai */}
+
       <Routes>
         {/* --- Public Routes --- */}
         <Route path="/" element={<LandingPage />} /> 
@@ -38,7 +48,11 @@ function App() {
 
         {/* --- Protected Routes (Sirf Login ke baad) --- */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          {/* Dashboard pass currentLang and setLang for full activation */}
+          <Route 
+            path="/dashboard" 
+            element={<Dashboard currentLang={currentLang} setLang={setCurrentLang} />} 
+          />
           
           {/* Members Module */}
           <Route path="/members" element={<Member />}>

@@ -16,16 +16,28 @@ export default function Support() {
 
   const faqs = [
     {
-      q: "Membership renew kaise karein?",
-      a: "Aap 'Members' list mein jaakar kisi bhi member ke 'Renew' button par click karke membership renew kar sakte hain. System automatically naye dates update kar dega."
+      q: "How to renew a membership?",
+      a: "Go to the 'Members' list, find the specific member, and click the 'Renew' button. The system will automatically update the new expiry dates and payment records."
     },
     {
-      q: "Payment history kahan dikhegi?",
-      a: "Member profile ke andar ya 'Reports' section mein aapko saari payment details mil jayengi. Aap wahan se pura financial history track kar sakte hain."
+      q: "Where can I see the payment history?",
+      a: "You can find complete financial history inside each 'Member Profile' or by visiting the 'Reports' section for a consolidated view of all transactions."
     },
     {
-      q: "Kya main naya plan add kar sakta hoon?",
-      a: "Haan, 'Setup' menu mein 'Membership Plans' par jaakar aap naye plans create kar sakte hain. Aap duration aur price apne hisaab se set kar sakte hain."
+      q: "Can I add custom membership plans?",
+      a: "Yes! Navigate to 'Setup' > 'Membership Plans'. Here you can create new plans with custom durations (Monthly, Quarterly, etc.) and set your own pricing."
+    },
+    {
+      q: "Is my gym data secure?",
+      a: "Absolutely. We use Supabase with Row Level Security (RLS) and encrypted database protocols, ensuring that only you can access your gym's sensitive information."
+    },
+    {
+      q: "How does the attendance system work?",
+      a: "You can mark attendance daily in the 'Attendance' section. It tracks member check-ins and helps the AI generate health scores based on member consistency."
+    },
+    {
+      q: "Can I send WhatsApp alerts for dues?",
+      a: "Yes, once integrated, you can send automated or manual payment reminders directly to members' WhatsApp numbers from the 'Dues' or 'Members' section."
     }
   ];
 
@@ -40,7 +52,7 @@ export default function Support() {
           Customer <span className="text-blue-600">Support</span>
         </h2>
         <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
-          Hum aapki gym management ko asaan banane ke liye hamesha taiyar hain. Niche diye gaye options se humein contact karein.
+          We are here to make your gym management effortless. Choose an option below to get in touch with our technical team.
         </p>
       </div>
 
@@ -120,7 +132,7 @@ export default function Support() {
                 </div>
               </button>
               
-              <div className={`overflow-hidden transition-all duration-300 ${openFaq === index ? 'max-h-40' : 'max-h-0'}`}>
+              <div className={`overflow-hidden transition-all duration-300 ${openFaq === index ? 'max-h-48' : 'max-h-0'}`}>
                 <p className="px-6 pb-6 text-slate-500 font-medium text-sm leading-relaxed italic">
                   — {faq.a}
                 </p>

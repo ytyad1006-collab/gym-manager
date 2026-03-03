@@ -7,20 +7,32 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-function Sidebar() {
+// ✅ Added currentLang as a prop
+function Sidebar({ currentLang = 'en' }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
 
+  // ✅ Translation Object for Menu Items
+  const t = {
+    en: { dashboard: "Dashboard", list: "Members List", add: "Add Member", payments: "Payments", attendance: "Attendance", expenses: "Expenses", reports: "Reports", setup: "Setup Gym", support: "Support", logout: "Logout" },
+    hi: { dashboard: "डैशबोर्ड", list: "सदस्य सूची", add: "सदस्य जोड़ें", payments: "भुगतान", attendance: "उपस्थिति", expenses: "खर्चे", reports: "रिपोर्ट्स", setup: "जिम सेटअप", support: "सहायता", logout: "लॉगआउट" },
+    mr: { dashboard: "डॅशबोर्ड", list: "सदस्य यादी", add: "सदस्य जोडा", payments: "देयके", attendance: "हजेरी", expenses: "खर्च", reports: "अहवाल", setup: "जिम सेटअप", support: "मदत", logout: "लॉगआउट" },
+    pa: { dashboard: "ਡੈਸ਼ਬੋਰਡ", list: "ਮੈਂਬਰ ਸੂਚੀ", add: "ਮੈਂਬਰ ਜੋੜੋ", payments: "ਭੁਗਤਾਨ", attendance: "ਹਾਜ਼ਰੀ", expenses: "ਖਰਚੇ", reports: "ਰਿਪੋਰਟਾਂ", setup: "ਜਿਮ ਸੈੱਟਅੱਪ", support: "ਸਹਾਇਤਾ", logout: "ਲੌਗਆਉਟ" },
+    fr: { dashboard: "Tableau de bord", list: "Liste des membres", add: "Ajouter un membre", payments: "Paiements", attendance: "Présence", expenses: "Dépenses", reports: "Rapports", setup: "Configuration", support: "Support", logout: "Déconnexion" }
+  };
+
+  const currentT = t[currentLang] || t['en'];
+
   const menuItems = [
-    { path: "/dashboard", name: "Dashboard", icon: <LayoutDashboard size={20} /> },
-    { path: "/members/list", name: "Members List", icon: <Users size={20} /> },
-    { path: "/members/add", name: "Add Member", icon: <UserPlus size={20} /> },
-    { path: "/members/payments", name: "Payments", icon: <CreditCard size={20} /> },
-    { path: "/attendance", name: "Attendance", icon: <ClipboardList size={20} /> },
-    { path: "/expenses", name: "Expenses", icon: <CreditCard size={20} /> },
-    { path: "/reports", name: "Reports", icon: <BarChart3 size={20} /> },
-    { path: "/setup", name: "Setup Gym", icon: <Settings size={20} /> },
-    { path: "/support", name: "Support", icon: <HelpCircle size={20} /> },
+    { path: "/dashboard", name: currentT.dashboard, icon: <LayoutDashboard size={20} /> },
+    { path: "/members/list", name: currentT.list, icon: <Users size={20} /> },
+    { path: "/members/add", name: currentT.add, icon: <UserPlus size={20} /> },
+    { path: "/members/payments", name: currentT.payments, icon: <CreditCard size={20} /> },
+    { path: "/attendance", name: currentT.attendance, icon: <ClipboardList size={20} /> },
+    { path: "/expenses", name: currentT.expenses, icon: <CreditCard size={20} /> },
+    { path: "/reports", name: currentT.reports, icon: <BarChart3 size={20} /> },
+    { path: "/setup", name: currentT.setup, icon: <Settings size={20} /> },
+    { path: "/support", name: currentT.support, icon: <HelpCircle size={20} /> },
   ];
 
   const handleLogout = async () => {
@@ -33,7 +45,7 @@ function Sidebar() {
       style={{
         width: isCollapsed ? "85px" : "280px",
         height: "100vh",
-        background: "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)", // Rich Gradient
+        background: "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)",
         color: "white",
         display: "flex",
         flexDirection: "column",
@@ -123,7 +135,6 @@ function Sidebar() {
                 if(!isActive) e.currentTarget.style.background = "transparent";
               }}
             >
-              {/* Active Indicator Bar */}
               {isActive && (
                 <div style={{
                   position: "absolute",
@@ -186,7 +197,7 @@ function Sidebar() {
           }}
         >
           <span style={{ minWidth: "20px" }}><LogOut size={20} /></span>
-          {!isCollapsed && <span style={{ fontSize: "14px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px" }}>Logout</span>}
+          {!isCollapsed && <span style={{ fontSize: "14px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px" }}>{currentT.logout}</span>}
         </button>
       </div>
     </div>
