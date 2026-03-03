@@ -5,7 +5,7 @@ export default function Support() {
   const [openFaq, setOpenFaq] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  const emailId = "sayhello2satishyadav@gmail.com";
+  const emailId = "sayhello2gmi@gmail.com";
 
   const handleCopyEmail = (e) => {
     e.preventDefault();

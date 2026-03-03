@@ -24,25 +24,35 @@ function AddMember() {
     next_payment_date: "" 
   });
 
+  // ✅ Auth logic for data security
   const fetchPlans = async () => {
-    const { data, error } = await supabase.from("membership_plans").select("*");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from("membership_plans").select("*").eq('user_id', user.id);
     if (!error) setPlans(data);
   };
 
   const fetchTrainers = async () => {
-    const { data, error } = await supabase.from("trainers").select("*");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from("trainers").select("*").eq('user_id', user.id);
     if (!error) setTrainers(data);
   };
 
   const fetchMembers = async () => {
-    const { data, error } = await supabase.from("members").select("*").order("created_at", { ascending: false });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from("members").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
     if (!error) setMembers(data);
   };
 
   const fetchPayments = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     const { data, error } = await supabase
       .from("payments")
       .select(`*, members!fk_member_new(name)`) 
+      .eq('user_id', user.id)
       .order("created_at", { ascending: false })
       .limit(10);
     if (!error) setPayments(data);
@@ -73,11 +83,16 @@ function AddMember() {
     }
   };
   
-  const finalPrice = formData.discount_type === "Percentage" 
-    ? formData.plan_price - (formData.plan_price * formData.discount_value / 100)
-    : formData.plan_price - formData.discount_value;
+  // FIX: Added Number() and default 0 to prevent empty string calculations
+  const currentDiscountValue = Number(formData.discount_value) || 0;
+  const currentPlanPrice = Number(formData.plan_price) || 0;
+  const currentPaidAmount = Number(formData.paid_amount) || 0;
 
-  const dueAmount = finalPrice - formData.paid_amount;
+  const finalPrice = formData.discount_type === "Percentage" 
+    ? currentPlanPrice - (currentPlanPrice * currentDiscountValue / 100)
+    : currentPlanPrice - currentDiscountValue;
+
+  const dueAmount = finalPrice - currentPaidAmount;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,9 +100,13 @@ function AddMember() {
     
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Authentication required");
+
       const { data: member, error: mError } = await supabase
         .from("members")
         .insert([{
+          user_id: user.id,
           name: formData.name,
           phone: formData.whatsapp,
           gender: formData.gender,
@@ -96,21 +115,22 @@ function AddMember() {
           joining_date: formData.joining_date,
           expiry_date: formData.next_payment_date, 
           total_amount: finalPrice,
-          paid_amount: formData.paid_amount,
+          paid_amount: currentPaidAmount, // Fixed to use sanitized number
           due_amount: dueAmount
         }]).select();
 
       if (mError) throw mError;
 
-      if (formData.paid_amount > 0 && member && member[0]) {
+      if (currentPaidAmount > 0 && member && member[0]) {
         const { error: pError } = await supabase.from("payments").insert([{
+          user_id: user.id,
           member_id: member[0].id,
-          amount: formData.paid_amount,
+          amount: currentPaidAmount, // Fixed to use sanitized number
           payment_mode: formData.payment_mode,
           payment_date: formData.joining_date,
-          plan_price: formData.plan_price,
+          plan_price: currentPlanPrice,
           discount_type: formData.discount_type,
-          discount_value: formData.discount_value,
+          discount_value: currentDiscountValue, // Fixed to use sanitized number
           next_payment_date: formData.next_payment_date,
           notes: "Initial registration payment"
         }]);
@@ -222,7 +242,7 @@ function AddMember() {
             </div>
           </div>
 
-          {/* Pricing Section - Mobile Optimized Grid */}
+          {/* Pricing Section */}
           <div className="p-4 md:p-8 bg-slate-50 rounded-[24px] border border-slate-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8 items-center">
               <div className="space-y-4">
@@ -236,47 +256,47 @@ function AddMember() {
                 <div>
                   <input type="number" className="w-full px-4 py-3 border border-slate-200 rounded-xl font-bold" placeholder="Value"
                     value={formData.discount_value || ""}
-                    onChange={(e) => setFormData({...formData, discount_value: Number(e.target.value) || ""})} />
+                    onChange={(e) => setFormData({...formData, discount_value: e.target.value})} />
                 </div>
               </div>
 
               <div className="flex flex-col items-center justify-center p-5 bg-white rounded-3xl border border-slate-100">
-                 <span className="text-[9px] font-black text-slate-300 uppercase mb-1">Final Price</span>
-                 <span className="text-2xl md:text-3xl font-black text-slate-900 italic">₹{finalPrice}</span>
+                  <span className="text-[9px] font-black text-slate-300 uppercase mb-1">Final Price</span>
+                  <span className="text-2xl md:text-3xl font-black text-slate-900 italic">₹{finalPrice}</span>
               </div>
 
               <div>
                 <label className="text-[10px] font-black text-blue-600 uppercase mb-2 block">Amount Paid Now</label>
                 <input type="number" className="w-full px-5 py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-black text-xl placeholder:text-blue-300 shadow-lg shadow-blue-200" placeholder="0" 
                   value={formData.paid_amount || ""}
-                  onChange={(e) => setFormData({...formData, paid_amount: Number(e.target.value) || ""})} />
+                  onChange={(e) => setFormData({...formData, paid_amount: e.target.value})} />
               </div>
 
               <div className={`flex flex-col items-center justify-center p-5 rounded-3xl border-2 border-dashed ${dueAmount > 0 ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
-                 <span className="text-[9px] font-black uppercase mb-1 opacity-60">Balance Due</span>
-                 <span className="text-2xl md:text-3xl font-black italic">₹{dueAmount}</span>
+                  <span className="text-[9px] font-black uppercase mb-1 opacity-60">Balance Due</span>
+                  <span className="text-2xl md:text-3xl font-black italic">₹{dueAmount}</span>
               </div>
             </div>
           </div>
 
-          {/* Footer Actions - Responsive Buttons */}
+          {/* Footer Actions */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-4">
             <div className="flex flex-wrap items-center justify-center gap-2 bg-slate-100 p-2 rounded-[24px] w-full md:w-auto">
-               {[
-                 {id: 'Cash', icon: Banknote, color: 'text-orange-500'}, 
-                 {id: 'Online', icon: Smartphone, color: 'text-blue-500'}, 
-                 {id: 'Card', icon: Landmark, color: 'text-emerald-500'}
-               ].map(mode => (
-                 <button 
-                   key={mode.id} 
-                   type="button" 
-                   onClick={() => setFormData({...formData, payment_mode: mode.id})} 
-                   className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase transition-all ${formData.payment_mode === mode.id ? 'bg-white text-slate-900 shadow-md scale-105' : 'text-slate-400'}`}
-                 >
-                   <mode.icon size={14} className={formData.payment_mode === mode.id ? mode.color : 'text-slate-300'} />
-                   {mode.id}
-                 </button>
-               ))}
+                {[
+                  {id: 'Cash', icon: Banknote, color: 'text-orange-500'}, 
+                  {id: 'Online', icon: Smartphone, color: 'text-blue-500'}, 
+                  {id: 'Card', icon: Landmark, color: 'text-emerald-500'}
+                ].map(mode => (
+                  <button 
+                    key={mode.id} 
+                    type="button" 
+                    onClick={() => setFormData({...formData, payment_mode: mode.id})} 
+                    className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase transition-all ${formData.payment_mode === mode.id ? 'bg-white text-slate-900 shadow-md scale-105' : 'text-slate-400'}`}
+                  >
+                    <mode.icon size={14} className={formData.payment_mode === mode.id ? mode.color : 'text-slate-300'} />
+                    {mode.id}
+                  </button>
+                ))}
             </div>
             
             <button type="submit" disabled={loading} className="w-full md:w-auto bg-slate-900 text-white px-10 py-4 md:py-5 rounded-2xl font-black text-xs md:text-sm uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
@@ -286,7 +306,7 @@ function AddMember() {
         </form>
       </div>
 
-      {/* Tables Section - Safe Scroll for Mobile */}
+      {/* Tables Section */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         <div className="bg-white rounded-[24px] shadow-xl border border-slate-100 overflow-hidden">
           <div className="p-5 border-b border-slate-50 bg-slate-50/50">

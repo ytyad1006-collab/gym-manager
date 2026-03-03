@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom"; 
+// ✅ AuthContext import kiya user data access karne ke liye
+import { useAuth } from "../context/AuthContext"; 
 import { PlusCircle, FileText, Users, ArrowUpRight, Sun, Moon, Sunrise, Sunset, Lightbulb, RefreshCw, Zap, TrendingUp, IndianRupee, Sparkles, Globe } from "lucide-react"; 
 import StatCard from "../components/ui/StatCard";
 import RevenueChart from "../components/ui/RevenueChart";
 import RecentActivity from "../components/ui/RecentActivity";
 
-// ✅ currentLang aur setLang (activation ke liye) props receive kiye
 function Dashboard({ currentLang = 'en', setLang }) {
   const navigate = useNavigate(); 
+  // ✅ Context se user nikal liya
+  const { user } = useAuth(); 
   const [gymName, setGymName] = useState("Your Gym"); 
   const [greeting, setGreeting] = useState({ text: "", icon: null }); 
 
-  // ✅ Translation Object
   const t = {
     en: { welcome: "Dashboard", health: "AI Gym Health Score", add: "Add Member", suggest: "Suggest", status: "Operational", analysis: "AI Analysis: Revenue is predicted to grow.", retention: "Member Retention" },
     hi: { welcome: "डैशबोर्ड", health: "AI जिम हेल्थ स्कोर", add: "सदस्य जोड़ें", suggest: "सुझाव", status: "सक्रिय", analysis: "AI विश्लेषण: अगले महीने आय बढ़ने की उम्मीद है।", retention: "सदस्य प्रतिधारण" },
-    mr: { welcome: "डॅशボード", health: "AI जिम हेल्थ स्कोअर", add: "सदस्य जोडा", suggest: "सुझाव", status: "कार्यरत", analysis: "AI विश्लेषण: पुढच्या महिन्यात महसूल वाढण्याची शक्यता आहे.", retention: "सदस्य टिकवून ठेवणे" },
+    mr: { welcome: "डॅशबोर्ड", health: "AI जिम हेल्थ स्कोअर", add: "सदस्य जोडा", suggest: "सुझाव", status: "कार्यरत", analysis: "AI विश्लेषण: पुढच्या महिन्यात महसूल वाढण्याची शक्यता आहे.", retention: "सदस्य टिकवून ठेवणे" },
     pa: { welcome: "ਡੈਸ਼ਬੋਰਡ", health: "AI ਜਿਮ ਹੈਲਥ ਸਕੋਰ", add: "ਮੈਂਬਰ ਜੋੜੋ", suggest: "ਸੁਝਾਅ", status: "ਚਾਲੂ", analysis: "AI ਵਿਸ਼ਲੇਸ਼ਣ: ਅਗਲੇ ਮਹੀਨੇ ਆਮਦਨ ਵਧਣ ਦੀ ਉਮੀਦ ਹੈ।", retention: "ਮੈਂਬਰ ਧਾਰਨ" },
     fr: { welcome: "Tableau de bord", health: "Score de santé IA", add: "Ajouter", suggest: "Suggérer", status: "Opérationnel", analysis: "Analyse IA : Le revenu devrait augmenter.", retention: "Rétention des membres" }
   };
@@ -27,6 +29,9 @@ function Dashboard({ currentLang = 'en', setLang }) {
     todayCollection: 0, totalPaid: 0, totalDue: 0, totalExpenses: 0,
     totalMembers: 0, expiredMembers: 0, expiry7Days: 0, expiry3Days: 0,
     totalTrainers: 0, thisMonthRevenue: 0, totalRevenue: 0,
+    // New fields for AI Logic
+    aiScore: 88,
+    dynamicAnalysis: ""
   });
 
   const [monthlyData, setMonthlyData] = useState([]);
@@ -34,11 +39,16 @@ function Dashboard({ currentLang = 'en', setLang }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // ✅ User session check karke gym name set karna
+    if (user) {
+      const name = user.user_metadata?.gym_name || "Your Gym";
+      setGymName(name);
+    }
     fetchDashboardData();
     updateGreeting(); 
-  }, [currentLang]); // Language badalne par greeting update hogi
+  }, [currentLang, user]); // User change hone par bhi update hoga
 
-  const updateGreeting = async () => {
+  const updateGreeting = () => {
     const hour = new Date().getHours();
     let welcomeText = "";
     let welcomeIcon = null;
@@ -57,16 +67,14 @@ function Dashboard({ currentLang = 'en', setLang }) {
       welcomeIcon = <Moon className="text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]" size={24} />;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const name = user?.user_metadata?.gym_name || "Your Gym";
-    
-    setGymName(name);
     setGreeting({ text: welcomeText, icon: welcomeIcon });
   };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      if (!user) return;
+
       const today = new Date().toISOString().split("T")[0];
       const currentMonthKey = new Date().toISOString().slice(0, 7); 
       
@@ -84,10 +92,20 @@ function Dashboard({ currentLang = 'en', setLang }) {
         supabase
           .from("payments")
           .select(`amount, payment_date, members (name)`)
+          .eq('user_id', user.id)
           .order("payment_date", { ascending: false }),
-        supabase.from("members").select("due_amount, expiry_date"),
-        supabase.from("expenses").select("amount"),
-        supabase.from("trainers").select("id")
+        supabase
+          .from("members")
+          .select("due_amount, expiry_date")
+          .eq('user_id', user.id),
+        supabase
+          .from("expenses")
+          .select("amount")
+          .eq('user_id', user.id),
+        supabase
+          .from("trainers")
+          .select("id")
+          .eq('user_id', user.id)
       ]);
 
       const totalRevenue = payments?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0;
@@ -101,6 +119,17 @@ function Dashboard({ currentLang = 'en', setLang }) {
         return sum + (parseFloat(m.due_amount) || 0);
       }, 0) || 0;
 
+      // ✅ AI Score Logic (Based on active member ratio)
+      const expiredCount = members?.filter(m => m.expiry_date < today).length || 0;
+      const activeCount = (members?.length || 0) - expiredCount;
+      const healthScore = members?.length > 0 ? Math.round((activeCount / members.length) * 100) : 0;
+
+      // ✅ AI Analysis Text Logic
+      let aiText = currentT.analysis;
+      if (thisMonthRevenue < totalExpenses) {
+        aiText = currentLang === 'hi' ? "AI विश्लेषण: खर्च बढ़ रहे हैं, मेम्बरशिप रिन्यूअल पर ध्यान दें।" : "AI Analysis: Expenses exceed revenue, focus on renewals.";
+      }
+
       setStats({
         todayCollection: payments?.filter(p => p.payment_date === today).reduce((sum, p) => sum + Number(p.amount), 0) || 0,
         totalPaid: totalRevenue, 
@@ -109,10 +138,12 @@ function Dashboard({ currentLang = 'en', setLang }) {
         totalDue: Math.round(calculatedDue), 
         totalExpenses,
         totalMembers: members?.length || 0,
-        expiredMembers: members?.filter(m => m.expiry_date < today).length || 0,
+        expiredMembers: expiredCount,
         expiry7Days: members?.filter(m => m.expiry_date >= today && m.expiry_date <= d7Str).length || 0,
         expiry3Days: members?.filter(m => m.expiry_date >= today && m.expiry_date <= d3Str).length || 0,
         totalTrainers: trainers?.length || 0,
+        aiScore: healthScore || 88,
+        dynamicAnalysis: aiText
       });
 
       setRecentPayments(payments?.slice(0, 5) || []);
@@ -166,13 +197,15 @@ function Dashboard({ currentLang = 'en', setLang }) {
             <div>
               <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] mb-1">{currentT.health}</p>
               <div className="flex items-end gap-2">
-                <h2 className="text-5xl font-black italic">88<span className="text-xl opacity-50">/100</span></h2>
-                <span className="bg-emerald-500 text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 uppercase tracking-tighter">Perfect</span>
+                <h2 className="text-5xl font-black italic">{stats.aiScore}<span className="text-xl opacity-50">/100</span></h2>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 uppercase tracking-tighter ${stats.aiScore > 70 ? 'bg-emerald-500' : 'bg-orange-500'}`}>
+                  {stats.aiScore > 70 ? 'Perfect' : 'Action Needed'}
+                </span>
               </div>
             </div>
           </div>
           <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5 max-w-sm">
-             <p className="text-[11px] leading-relaxed font-medium text-indigo-50">✨ <span className="font-bold">AI INSIGHT:</span> {currentT.analysis}</p>
+             <p className="text-[11px] leading-relaxed font-medium text-indigo-50">✨ <span className="font-bold">AI INSIGHT:</span> {stats.dynamicAnalysis || currentT.analysis}</p>
           </div>
         </div>
       </div>
@@ -195,7 +228,6 @@ function Dashboard({ currentLang = 'en', setLang }) {
         
         <div className="flex flex-row gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 items-center">
           
-          {/* ✅ Language Selector - Precisely Placed & Activated */}
           <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm shrink-0">
             <Globe size={14} className="text-slate-400" />
             <select 
@@ -234,7 +266,6 @@ function Dashboard({ currentLang = 'en', setLang }) {
         </div>
       </div>
 
-      {/* Stats Cards Grid (Remaining code stays exactly same) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <StatCard title="Today's Cash" value={`₹${stats.todayCollection.toLocaleString()}`} color="bg-emerald-500" />
         <StatCard title="This Month" value={`₹${stats.thisMonthRevenue.toLocaleString()}`} color="bg-blue-600" />

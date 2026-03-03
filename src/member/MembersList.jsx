@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { Search, Loader2, MoreVertical, MessageCircle, Edit2, RefreshCw, Eye, Trash2, X, Download, Send, Phone, Calendar, Mail, Clock, ShieldCheck } from "lucide-react";
+import { Search, Loader2, MoreVertical, MessageCircle, Edit2, RefreshCw, Eye, Trash2, X, Download, Send, Phone, Calendar, Mail, Clock, ShieldCheck, Filter, AlertTriangle } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 export default function MembersList() {
@@ -11,6 +11,8 @@ export default function MembersList() {
   const [activeMenu, setActiveMenu] = useState(null);
   const [gymName, setGymName] = useState("Our Gym");
   
+  const [filterType, setFilterType] = useState("all");
+
   const [selectedMember, setSelectedMember] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -20,6 +22,9 @@ export default function MembersList() {
   const [duePayment, setDuePayment] = useState("");
   const [customMessage, setCustomMessage] = useState("");
 
+  const [editFormData, setEditFormData] = useState({ name: "", phone: "", plan_id: "" });
+  const [renewPlanId, setRenewPlanId] = useState("");
+
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => { 
@@ -27,16 +32,15 @@ export default function MembersList() {
     getGymInfo();
   }, []);
 
-  // ✅ 1. NEW LOGIC: Calculate Remaining Days
   const calculateRemainingDays = (expiryDate) => {
     const todayDate = new Date();
+    todayDate.setHours(0,0,0,0);
     const expiry = new Date(expiryDate);
     const diffTime = expiry - todayDate;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    return diffDays; 
   };
 
-  // ✅ 2. NEW LOGIC: Handle Status Toggle (Manual Inactive/Active)
   const handleStatusToggle = async (id, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     const { error } = await supabase.from("members").update({ status: newStatus }).eq("id", id);
@@ -53,8 +57,19 @@ export default function MembersList() {
   const fetchMembers = async () => {
     try {
       setLoading(true);
-      const { data: membersData } = await supabase.from("members").select("*").order("created_at", { ascending: false });
-      const { data: plansData } = await supabase.from("membership_plans").select("*");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: membersData } = await supabase
+        .from("members")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const { data: plansData } = await supabase
+        .from("membership_plans")
+        .select("*")
+        .eq("user_id", user.id);
 
       setPlans(plansData || []);
       const mergedData = (membersData || []).map(member => ({
@@ -65,42 +80,110 @@ export default function MembersList() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
+  // ✅ FIXED: HISTORY ADDING LOGIC (Added plan_price to satisfy database constraints)
   const handleCollectDue = async () => {
     const amount = Number(duePayment);
     if (amount <= 0 || amount > selectedMember.due_amount) {
-      alert("Please enter a valid amount within the due limit.");
+      alert("Please enter a valid amount.");
       return;
     }
-    const { error } = await supabase.from("members").update({
-      due_amount: selectedMember.due_amount - amount,
-      paid_amount: (selectedMember.paid_amount || 0) + amount
-    }).eq("id", selectedMember.id);
 
-    if (!error) {
-      await supabase.from("payments").insert([{
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User session not found");
+
+      // 1. Update Member
+      const { error: updateError } = await supabase.from("members").update({
+        due_amount: Number(selectedMember.due_amount) - amount,
+        paid_amount: (Number(selectedMember.paid_amount) || 0) + amount
+      }).eq("id", selectedMember.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Insert Payment Record into 'payments' table
+      const { error: paymentError } = await supabase.from("payments").insert([{
         member_id: selectedMember.id,
+        user_id: user.id,
         amount: amount,
+        plan_price: amount, // Added to fix "null value violates not-null constraint"
         payment_date: today,
         payment_mode: "Due Collection"
       }]);
+
+      if (paymentError) {
+        console.error("Payment Insert Error:", paymentError);
+        alert(`Due cut gaya par history add nahi hui: ${paymentError.message}`);
+      } else {
+        alert("Payment Success & History Updated! 💪");
+      }
+
       fetchMembers();
       setShowDueModal(false);
       setDuePayment("");
+      
+    } catch (error) {
+      console.error(error);
+      alert("Error: " + error.message);
+    }
+  };
+
+  const handleEditMember = async () => {
+    const { error } = await supabase
+      .from("members")
+      .update({ 
+        name: editFormData.name, 
+        phone: editFormData.phone, 
+        plan_id: editFormData.plan_id 
+      })
+      .eq("id", selectedMember.id);
+
+    if (!error) {
+      alert("Profile updated!");
+      setShowEditModal(false);
+      fetchMembers();
+    }
+  };
+
+  const handleRenewPlan = async () => {
+    const selectedPlan = plans.find(p => p.id === renewPlanId);
+    if (!selectedPlan) return alert("Select a plan");
+
+    const newExpiry = new Date();
+    newExpiry.setMonth(newExpiry.getMonth() + (selectedPlan.duration || 1));
+
+    const { error } = await supabase
+      .from("members")
+      .update({ 
+        plan_id: renewPlanId,
+        expiry_date: newExpiry.toISOString().split('T')[0],
+        status: 'active'
+      })
+      .eq("id", selectedMember.id);
+
+    if (!error) {
+      alert("Membership Renewed!");
+      setShowRenewModal(false);
+      fetchMembers();
     }
   };
 
   const deleteMember = async (id) => {
-    if (window.confirm("Are you sure? This will remove the member permanently.")) {
-      const { error } = await supabase.from("members").delete().eq("id", id);
-      if (!error) fetchMembers();
+    if (window.confirm("⚠️ Are you sure? This will permanently delete the member and their payment history.")) {
+      try {
+        await supabase.from("payments").delete().eq("member_id", id);
+        const { error } = await supabase.from("members").delete().eq("id", id);
+        if (error) throw error;
+        alert("Member removed successfully.");
+        fetchMembers();
+      } catch (err) {
+        alert("Error deleting member: " + err.message);
+      }
     }
   };
 
   const exportToExcel = () => {
     const exportData = filteredMembers.map(m => ({
-      "Name": m.name, "Phone": m.phone, "Email": m.email, "Join Date": m.created_at?.split('T')[0],
-      "Expiry": m.expiry_date, "Plan": m.membership_plans?.name, "Due": m.due_amount,
-      "Status": m.status || 'active'
+      "Name": m.name, "Phone": m.phone, "Expiry": m.expiry_date, "Plan": m.membership_plans?.name, "Due": m.due_amount, "Status": m.status || 'active'
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -108,106 +191,93 @@ export default function MembersList() {
     XLSX.writeFile(wb, `${gymName}_Members.xlsx`);
   };
 
-  const sendWhatsAppMessage = (type, member) => {
+  const handleWhatsAppSend = (type, member = selectedMember) => {
     let msg = "";
-    if (type === "welcome") msg = `Hi ${member.name}, Welcome to ${gymName}! 💪 We are glad to have you.`;
-    else if (type === "expiry") msg = `Hi ${member.name}, your membership at ${gymName} expires on ${member.expiry_date}. Please renew to continue.`;
-    else if (type === "payment") msg = `Hi ${member.name}, a friendly reminder from ${gymName} to clear your pending due of ₹${member.due_amount}.`;
-    else msg = `${customMessage} - Regards, ${gymName}`;
-    
-    window.open(`https://wa.me/91${member.phone}?text=${encodeURIComponent(msg)}`, "_blank");
-    setShowWhatsAppModal(false);
-    setCustomMessage("");
-  };
+    if (type === "welcome") msg = `Hi ${member.name}, Welcome to ${gymName}! 💪 Hum khushi mehsoos kar rahe hain ki aapne humein chuna. Let's get fit!`;
+    else if (type === "expiry") msg = `Hi ${member.name}, aapki ${gymName} ki membership ${member.expiry_date} ko expire ho rahi hai. Please timely renew karwa lein.`;
+    else if (type === "payment") msg = `Hi ${member.name}, ye aapke pending dues ₹${member.due_amount} ke liye reminder hai. Please ise clear kar dein.`;
+    else if (type === "custom") msg = customMessage;
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.from("members").update({
-        name: selectedMember.name,
-        phone: selectedMember.phone,
-        email: selectedMember.email,
-        expiry_date: selectedMember.expiry_date 
-    }).eq("id", selectedMember.id);
-    if (!error) { fetchMembers(); setShowEditModal(false); }
-  };
-
-  const handleRenewWithPayment = async (planId, amountPaid) => {
-    const plan = plans.find(p => p.id === planId);
-    const newExpiry = new Date();
-    newExpiry.setMonth(newExpiry.getMonth() + 1); 
-    
-    const newDue = Math.max(0, plan.price - amountPaid);
-
-    const { error } = await supabase.from("members").update({
-      plan_id: planId,
-      expiry_date: newExpiry.toISOString().split('T')[0],
-      due_amount: newDue,
-      paid_amount: (selectedMember.paid_amount || 0) + Number(amountPaid),
-      status: 'active' // Renew karte hi auto-active
-    }).eq("id", selectedMember.id);
-
-    if (!error) {
-      await supabase.from("payments").insert([{
-        member_id: selectedMember.id,
-        amount: amountPaid,
-        payment_date: today,
-        payment_mode: "Cash/Online"
-      }]);
-      fetchMembers();
-      setShowRenewModal(false);
+    if (msg) {
+        window.open(`https://wa.me/91${member.phone}?text=${encodeURIComponent(msg)}`, "_blank");
+        if(type === "custom") {
+            setCustomMessage("");
+            setShowWhatsAppModal(false);
+        }
     }
   };
 
-  const filteredMembers = members.filter(m => 
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.phone?.includes(searchTerm)
-  );
+  const filteredMembers = members.filter(m => {
+    const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.phone?.includes(searchTerm);
+    const daysLeft = calculateRemainingDays(m.expiry_date);
+    const status = m.status || 'active';
+
+    if (!matchesSearch) return false;
+
+    switch (filterType) {
+      case "active": return status === 'active';
+      case "inactive": return status === 'inactive';
+      case "expiring": return daysLeft > 0 && daysLeft <= 7;
+      case "expired": return daysLeft <= 0;
+      case "due": return m.due_amount > 0;
+      default: return true;
+    }
+  });
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto animate-page overflow-x-hidden">
-      {/* Header Section */}
+      
+      {/* 🚀 Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 md:p-6 rounded-[24px] shadow-sm border border-slate-100">
         <div>
-          <h3 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight italic uppercase">{gymName} CREW</h3>
-          <p className="text-xs md:text-sm text-slate-400 font-medium tracking-wide">Total: {filteredMembers.length} Souls</p>
+          <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight italic uppercase">{gymName} CREW</h3>
+          <p className="text-xs md:text-sm text-slate-400 font-bold tracking-widest uppercase">Showing: {filteredMembers.length} Members</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-64 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search name or phone..." 
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-xs font-bold" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 w-full sm:w-auto">
+            <Filter size={14} className="text-slate-400" />
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="bg-transparent py-2.5 text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer text-slate-700">
+              <option value="all">All Members</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive</option>
+              <option value="expiring">Expiring Soon (7d)</option>
+              <option value="expired">Expired</option>
+              <option value="due">Pending Dues</option>
+            </select>
           </div>
-          <button 
-            onClick={exportToExcel} 
-            className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all w-full sm:w-auto border border-emerald-100 shadow-sm"
-          >
+
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input type="text" placeholder="Search..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-xs font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          <button onClick={exportToExcel} className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all w-full sm:w-auto border border-emerald-100">
             <Download size={16} /> Export
           </button>
         </div>
       </div>
 
-      {/* Members List */}
+      {/* 📋 Members List */}
       <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-20 space-y-4">
-             <Loader2 className="animate-spin text-blue-600" size={40} />
-             <p className="text-slate-400 font-medium animate-pulse text-sm">Synchronizing Data...</p>
+          <div className="flex flex-col items-center justify-center p-20 space-y-4 text-center">
+              <Loader2 className="animate-spin text-blue-600" size={40} />
+              <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Syncing Gym Database...</p>
+          </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="p-20 text-center flex flex-col items-center">
+            <AlertTriangle className="text-slate-200 mb-4" size={48} />
+            <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No Members Found</p>
           </div>
         ) : (
           <>
-            {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50/50 border-b border-slate-100">
+                <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Member Info</th>
-                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Days Remaining</th>
-                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact & Status</th>
+                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Member</th>
+                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Validity</th>
+                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status & Mobile</th>
                     <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
@@ -215,71 +285,43 @@ export default function MembersList() {
                   {filteredMembers.map((m) => {
                     const daysLeft = calculateRemainingDays(m.expiry_date);
                     return (
-                      <tr key={m.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xs font-black uppercase shadow-lg shadow-slate-200 flex-shrink-0">
-                              {m.name.substring(0, 2)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 text-sm truncate">{m.name}</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{m.membership_plans?.name}</p>
+                            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xs font-black uppercase">{m.name.substring(0, 2)}</div>
+                            <div>
+                              <p className="font-bold text-slate-900 text-sm">{m.name}</p>
+                              <p className="text-[10px] text-slate-400 font-black uppercase">{m.membership_plans?.name}</p>
                             </div>
                           </div>
                         </td>
-                        
-                        {/* ✅ REMAINING DAYS COLUMN */}
                         <td className="p-4">
                           <div className="flex flex-col gap-1 w-24">
-                            <span className={`text-[10px] font-black uppercase tracking-tight flex items-center gap-1 ${daysLeft <= 5 ? 'text-rose-600 animate-pulse' : 'text-slate-600'}`}>
-                              <Clock size={12}/> {daysLeft} Days Left
+                            <span className={`text-[9px] font-black uppercase flex items-center gap-1 ${daysLeft <= 5 ? 'text-rose-600 animate-pulse' : 'text-slate-500'}`}>
+                              <Clock size={12}/> {daysLeft <= 0 ? "Expired" : `${daysLeft} Days`}
                             </span>
                             <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${daysLeft <= 5 ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.min((daysLeft / 30) * 100, 100)}%` }}
-                              ></div>
+                              <div className={`h-full rounded-full ${daysLeft <= 5 ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${Math.max(0, Math.min((daysLeft / 30) * 100, 100))}%` }}></div>
                             </div>
                           </div>
                         </td>
-
                         <td className="p-4">
-                          <div className="flex flex-col gap-2">
-                             <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Phone size={12} className="text-blue-500"/> {m.phone}</span>
-                             {/* ✅ STATUS TOGGLE BUTTON */}
-                             <button 
-                                onClick={() => handleStatusToggle(m.id, m.status || 'active')}
-                                className={`w-fit px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border transition-all ${
-                                  (m.status || 'active') === 'active' && m.expiry_date >= today
-                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-rose-50 hover:text-rose-600' 
-                                  : 'bg-rose-50 text-rose-600 border-rose-100 hover:bg-emerald-50 hover:text-emerald-600'
-                                }`}
-                             >
-                                {(m.status || 'active') === 'active' && m.expiry_date >= today ? "● Active" : "○ Inactive"}
-                             </button>
-                          </div>
+                            <p className="text-xs font-bold text-slate-700 mb-1">{m.phone}</p>
+                            <button onClick={() => handleStatusToggle(m.id, m.status || 'active')} className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${m.status === 'inactive' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                             {m.status === 'inactive' ? "● Inactive" : "● Active"}
+                            </button>
                         </td>
-
                         <td className="p-4 text-right relative">
-                          <button 
-                            onClick={() => setActiveMenu(activeMenu === m.id ? null : m.id)}
-                            className="p-2 hover:bg-white rounded-lg transition-all text-slate-400 hover:text-slate-900 border border-transparent hover:border-slate-100"
-                          >
-                            <MoreVertical size={18} />
-                          </button>
-                          
+                          <button onClick={() => setActiveMenu(activeMenu === m.id ? null : m.id)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><MoreVertical size={18} /></button>
                           {activeMenu === m.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)}></div>
-                              <div className="absolute right-12 top-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 overflow-hidden py-1 animate-in fade-in zoom-in duration-200 text-left">
-                                <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-50"><Eye size={14} className="text-blue-500"/> View Profile</button>
-                                <button onClick={() => { setSelectedMember(m); setShowDueModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 text-orange-600 text-xs font-black transition-colors border-b border-slate-50"><Download size={14} className="rotate-180"/> Collect Due</button>
-                                <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-green-50 text-green-600 text-xs font-black transition-colors border-b border-slate-50"><MessageCircle size={14}/> WhatsApp</button>
-                                <button onClick={() => { setSelectedMember(m); setShowEditModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-blue-600 text-xs font-bold transition-colors border-b border-slate-50"><Edit2 size={14}/> Edit Info</button>
-                                <button onClick={() => { setSelectedMember(m); setShowRenewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 text-emerald-600 text-xs font-black transition-colors border-b border-slate-50"><RefreshCw size={14}/> Renew & Pay</button>
-                                <button onClick={() => {deleteMember(m.id); setActiveMenu(null);}} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-rose-50 text-rose-500 text-xs font-bold transition-colors"><Trash2 size={14}/> Remove</button>
-                              </div>
-                            </>
+                            <div className="absolute right-12 top-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-1 text-left animate-in zoom-in duration-150">
+                              <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-xs font-bold"><Eye size={14} className="text-blue-500"/> View Profile</button>
+                              <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id}); setShowEditModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-xs font-bold border-t border-slate-50"><Edit2 size={14} className="text-slate-500"/> Edit Profile</button>
+                              <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-green-50 text-green-600 text-xs font-black border-t border-slate-50"><MessageCircle size={14}/> WhatsApp</button>
+                              <button onClick={() => { setSelectedMember(m); setRenewPlanId(m.plan_id); setShowRenewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-blue-600 text-xs font-black border-t border-slate-50"><RefreshCw size={14}/> Renew Plan</button>
+                              <button onClick={() => { setSelectedMember(m); setShowDueModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 text-orange-600 text-xs font-black border-t border-slate-50"><Download size={14} className="rotate-180"/> Collect Due</button>
+                              <button onClick={() => { deleteMember(m.id); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-rose-50 text-rose-500 text-xs font-bold border-t border-slate-50"><Trash2 size={14}/> Remove</button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -288,142 +330,164 @@ export default function MembersList() {
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile View remains essentially the same but with added status indicator */}
-            <div className="md:hidden grid grid-cols-1 divide-y divide-slate-100">
-              {filteredMembers.map((m) => {
-                const daysLeft = calculateRemainingDays(m.expiry_date);
-                return (
-                  <div key={m.id} className="p-4 flex items-center justify-between gap-3 group active:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-black border-2 ${m.expiry_date >= today && (m.status || 'active') === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                        {m.name.substring(0, 2).toUpperCase()}
-                      </div>
+            
+            {/* Mobile View */}
+            <div className="md:hidden divide-y divide-slate-100">
+               {filteredMembers.map((m) => (
+                 <div key={m.id} className="p-4 flex items-center justify-between group">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xs font-black uppercase">{m.name.substring(0, 2)}</div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-black text-slate-800 text-sm truncate">{m.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${daysLeft <= 5 ? 'bg-rose-100 text-rose-700 animate-pulse' : 'bg-slate-100 text-slate-600'}`}>
-                             {daysLeft} Days Left
-                           </span>
-                           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${m.expiry_date >= today && (m.status || 'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                             {m.expiry_date >= today && (m.status || 'active') === 'active' ? "Active" : "Inactive"}
-                           </span>
-                        </div>
+                        <p className="font-black text-slate-800 text-sm truncate uppercase">{m.name}</p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase">{m.membership_plans?.name}</p>
                       </div>
                     </div>
-                    
-                    <div className="relative flex-shrink-0">
-                      <button onClick={() => setActiveMenu(activeMenu === m.id ? null : m.id)} className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-400 border border-slate-100 shadow-sm"><MoreVertical size={18} /></button>
-                      {activeMenu === m.id && (
-                        <>
-                          <div className="fixed inset-0 z-30" onClick={() => setActiveMenu(null)}></div>
-                          <div className="absolute right-0 top-12 w-44 bg-white border border-slate-100 rounded-2xl shadow-2xl z-40 overflow-hidden py-1 animate-in slide-in-from-top-2">
-                             <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700"><Eye size={14}/> View</button>
-                             <button onClick={() => { setSelectedMember(m); setShowDueModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-orange-600 border-t border-slate-50"><Download size={14} className="rotate-180"/> Collect Due</button>
-                             <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-green-600 border-t border-slate-50"><MessageCircle size={14}/> WhatsApp</button>
-                             <button onClick={() => { setSelectedMember(m); setShowRenewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-emerald-600 border-t border-slate-50"><RefreshCw size={14}/> Renew</button>
-                             <button onClick={() => {deleteMember(m.id); setActiveMenu(null);}} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-rose-500 border-t border-slate-50"><Trash2 size={14}/> Delete</button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                    <button onClick={() => setActiveMenu(activeMenu === m.id ? null : m.id)} className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-400"><MoreVertical size={18} /></button>
+                    {activeMenu === m.id && (
+                        <div className="absolute right-4 mt-32 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-40 py-1">
+                          <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-slate-700 border-b border-slate-50">View Profile</button>
+                          <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-black text-green-600 border-b border-slate-50">WhatsApp</button>
+                          <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id}); setShowEditModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-slate-700 border-b border-slate-50">Edit</button>
+                          <button onClick={() => { setSelectedMember(m); setRenewPlanId(m.plan_id); setShowRenewModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-black text-blue-600 border-b border-slate-50">Renew</button>
+                          <button onClick={() => { deleteMember(m.id); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-rose-500">Delete</button>
+                        </div>
+                    )}
+                 </div>
+               ))}
             </div>
           </>
         )}
       </div>
 
-      {/* MODALS SECTION (View, Edit, Due, WhatsApp, Renew) remain same as per your provided code */}
-      {/* ... [Pichla saara modal code yahan aayega] ... */}
-      
-      {/* (Baki ke modals upar wale code se same rahenge isliye repeat nahi kar raha) */}
+      {/* 👤 View Modal */}
       {showViewModal && selectedMember && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in">
-          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl border border-slate-100 animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="p-6 md:p-8 pb-4 flex justify-between items-start sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
+            <div className="p-6 flex justify-between items-center bg-slate-900 text-white">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-lg font-black uppercase">
-                  {selectedMember.name.substring(0,2)}
-                </div>
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-slate-900 italic tracking-tight">{selectedMember.name}</h2>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{selectedMember.membership_plans?.name}</p>
-                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-black">{selectedMember.name.substring(0,2)}</div>
+                <h2 className="text-xl font-black italic uppercase">{selectedMember.name}</h2>
               </div>
-              <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
+              <button onClick={() => setShowViewModal(false)}><X size={20}/></button>
             </div>
-            
-            <div className="p-6 md:p-8 pt-4 space-y-6">
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Joined On</p>
-                  <p className="font-black text-slate-700 text-xs flex items-center gap-2 tracking-tighter"><Calendar size={12} className="text-blue-500"/> {selectedMember.created_at?.split('T')[0]}</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Status</p>
+                  <p className={`font-black text-xs uppercase ${selectedMember.status === 'inactive' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedMember.status || 'Active'}</p>
                 </div>
-                <div className={`p-4 rounded-2xl border ${selectedMember.expiry_date >= today ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                  <p className={`text-[9px] font-black uppercase mb-1 ${selectedMember.expiry_date >= today ? 'text-emerald-400' : 'text-rose-400'}`}>Expiry Date</p>
-                  <p className={`font-black text-xs flex items-center gap-2 tracking-tighter ${selectedMember.expiry_date >= today ? 'text-emerald-600' : 'text-rose-600'}`}><Calendar size={12}/> {selectedMember.expiry_date}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Current Status</span>
-                   <span className={`text-xs font-black uppercase tracking-widest ${(selectedMember.status || 'active') === 'active' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                     {(selectedMember.status || 'active')}
-                   </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                   <span className="text-[10px] font-black text-slate-400 uppercase">WhatsApp</span>
-                   <span className="text-sm font-bold text-slate-700 tracking-tight">{selectedMember.phone}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Pending Due</span>
-                   <span className="text-xl font-black text-rose-500 italic">₹{selectedMember.due_amount}</span>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pending Due</p>
+                  <p className="font-black text-xs text-rose-500 italic">₹{selectedMember.due_amount}</p>
                 </div>
               </div>
-              
-              <button onClick={() => setShowViewModal(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-slate-200">Close Profile</button>
+              <div className="space-y-4 text-sm font-bold text-slate-600">
+                <div className="flex justify-between border-b pb-2"><span>Mobile</span><span>{selectedMember.phone}</span></div>
+                <div className="flex justify-between border-b pb-2"><span>Expiry</span><span>{selectedMember.expiry_date}</span></div>
+                <div className="flex justify-between border-b pb-2"><span>Plan</span><span>{selectedMember.membership_plans?.name}</span></div>
+              </div>
+              <button onClick={() => setShowViewModal(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Close Profile</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Collect Due Modal (from previous code) */}
-      {showDueModal && selectedMember && (
+      {/* ✍️ Edit Modal */}
+      {showEditModal && selectedMember && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-[32px] w-full max-w-sm p-6 md:p-8 shadow-2xl animate-in zoom-in duration-200">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <RefreshCw size={30} />
+          <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in">
+            <h2 className="text-xl font-black text-slate-900 italic uppercase mb-6">Edit Profile</h2>
+            <div className="space-y-4">
+              <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Name" value={editFormData.name} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} />
+              <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Phone" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})} />
+              <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" value={editFormData.plan_id} onChange={(e) => setEditFormData({...editFormData, plan_id: e.target.value})}>
+                {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowEditModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-400 rounded-xl font-black text-[10px] uppercase">Cancel</button>
+                <button onClick={handleEditMember} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase">Save Changes</button>
               </div>
-              <h2 className="text-xl font-black text-slate-900 italic uppercase">Clear Pending Due</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Member: {selectedMember.name}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔄 Renew Modal */}
+      {showRenewModal && selectedMember && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><RefreshCw size={30} /></div>
+              <h2 className="text-xl font-black text-slate-900 italic uppercase">Renew Plan</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{selectedMember.name}</p>
             </div>
             <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Total Outstanding</span>
-                <span className="text-lg font-black text-rose-500 italic">₹{selectedMember.due_amount}</span>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Amount Receiving Now</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-sm">₹</span>
-                  <input type="number" autoFocus className="w-full pl-8 pr-4 py-4 bg-slate-50 border-2 border-orange-100 rounded-2xl outline-none focus:border-orange-500 font-black text-lg transition-all" placeholder="0.00" value={duePayment} onChange={(e) => setDuePayment(e.target.value)} />
-                </div>
-              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase mb-[-10px]">Select New Plan</p>
+              <select className="w-full px-4 py-4 bg-slate-50 border-2 border-blue-50 rounded-2xl outline-none focus:border-blue-500 font-black text-sm" value={renewPlanId} onChange={(e) => setRenewPlanId(e.target.value)}>
+                <option value="">Choose Plan...</option>
+                {plans.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
+              </select>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowDueModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
-                <button onClick={handleCollectDue} className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-orange-100 hover:bg-orange-600 transition-all">Update</button>
+                <button onClick={() => setShowRenewModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
+                <button onClick={handleRenewPlan} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-blue-100">Confirm Renewal</button>
               </div>
             </div>
           </div>
         </div>
       )}
-      
-      {/* Note: Baki ke modals (WhatsApp, Edit, Renew) bhi usi flow me kaam karenge */}
-      {/* ... [Rest of your modal code here] ... */}
+
+      {/* 💰 Due Modal */}
+      {showDueModal && selectedMember && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4"><RefreshCw size={30} /></div>
+              <h2 className="text-xl font-black text-slate-900 italic uppercase">Collect Due</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Outstanding</span>
+                <span className="text-lg font-black text-rose-500 italic">₹{selectedMember.due_amount}</span>
+              </div>
+              <input type="number" className="w-full px-4 py-4 bg-slate-50 border-2 border-orange-100 rounded-2xl outline-none focus:border-orange-500 font-black text-lg text-center" placeholder="Amount" value={duePayment} onChange={(e) => setDuePayment(e.target.value)} />
+              <div className="flex gap-3">
+                <button onClick={() => setShowDueModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
+                <button onClick={handleCollectDue} className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-orange-100">Update</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📱 WhatsApp Modal */}
+      {showWhatsAppModal && selectedMember && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-[32px] w-full max-w-sm p-6 shadow-2xl animate-in zoom-in">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-black text-slate-900 uppercase italic">WhatsApp Actions</h2>
+              <button onClick={() => setShowWhatsAppModal(false)} className="text-slate-400"><X size={20}/></button>
+            </div>
+            <div className="space-y-3">
+              <button onClick={() => handleWhatsAppSend("welcome")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-100 rounded-2xl transition-all">
+                <span className="text-[10px] font-black uppercase text-slate-700">Welcome Message</span>
+                <Send size={14} className="text-emerald-500" />
+              </button>
+              <button onClick={() => handleWhatsAppSend("expiry")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-rose-50 border border-slate-100 rounded-2xl transition-all">
+                <span className="text-[10px] font-black uppercase text-slate-700">Expiry Reminder</span>
+                <Calendar size={14} className="text-rose-500" />
+              </button>
+              <button onClick={() => handleWhatsAppSend("payment")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-orange-50 border border-slate-100 rounded-2xl transition-all">
+                <span className="text-[10px] font-black uppercase text-slate-700">Pending Due</span>
+                <ShieldCheck size={14} className="text-orange-500" />
+              </button>
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs min-h-[80px]" placeholder="Type custom message..." value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} />
+                <button onClick={() => handleWhatsAppSend("custom")} className="w-full mt-3 py-3 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100">Send Custom Msg</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

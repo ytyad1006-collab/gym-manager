@@ -12,13 +12,13 @@ function Sidebar({ currentLang = 'en' }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
 
-  // ✅ Translation Object for Menu Items
+  // ✅ Translation Object for Menu Items (Settings/Account added)
   const t = {
-    en: { dashboard: "Dashboard", list: "Members List", add: "Add Member", payments: "Payments", attendance: "Attendance", expenses: "Expenses", reports: "Reports", setup: "Setup Gym", support: "Support", logout: "Logout" },
-    hi: { dashboard: "डैशबोर्ड", list: "सदस्य सूची", add: "सदस्य जोड़ें", payments: "भुगतान", attendance: "उपस्थिति", expenses: "खर्चे", reports: "रिपोर्ट्स", setup: "जिम सेटअप", support: "सहायता", logout: "लॉगआउट" },
-    mr: { dashboard: "डॅशबोर्ड", list: "सदस्य यादी", add: "सदस्य जोडा", payments: "देयके", attendance: "हजेरी", expenses: "खर्च", reports: "अहवाल", setup: "जिम सेटअप", support: "मदत", logout: "लॉगआउट" },
-    pa: { dashboard: "ਡੈਸ਼ਬੋਰਡ", list: "ਮੈਂਬਰ ਸੂਚੀ", add: "ਮੈਂਬਰ ਜੋੜੋ", payments: "ਭੁਗਤਾਨ", attendance: "ਹਾਜ਼ਰੀ", expenses: "ਖਰਚੇ", reports: "ਰਿਪੋਰਟਾਂ", setup: "ਜਿਮ ਸੈੱਟਅੱਪ", support: "ਸਹਾਇਤਾ", logout: "ਲੌਗਆਉਟ" },
-    fr: { dashboard: "Tableau de bord", list: "Liste des membres", add: "Ajouter un membre", payments: "Paiements", attendance: "Présence", expenses: "Dépenses", reports: "Rapports", setup: "Configuration", support: "Support", logout: "Déconnexion" }
+    en: { dashboard: "Dashboard", list: "Members List", add: "Add Member", payments: "Payments", attendance: "Attendance", expenses: "Expenses", reports: "Reports", setup: "Setup Gym", support: "Support", logout: "Logout", settings: "Account Settings" },
+    hi: { dashboard: "डैशबोर्ड", list: "सदस्य सूची", add: "सदस्य जोड़ें", payments: "भुगतान", attendance: "उपस्थिति", expenses: "खर्चे", reports: "रिपोर्ट्स", setup: "जिम सेटअप", support: "सहायता", logout: "लॉगआउट", settings: "खाता सेटिंग" },
+    mr: { dashboard: "डॅशबोर्ड", list: "सदस्य यादी", add: "सदस्य जोडा", payments: "देयके", attendance: "हजेरी", expenses: "खर्च", reports: "अहवाल", setup: "जिम सेटअप", support: "मदत", logout: "लॉगआउट", settings: "खाते सेटिंग" },
+    pa: { dashboard: "ਡੈਸ਼ਬੋਰਡ", list: "ਮੈਂਬਰ ਸੂਚੀ", add: "ਮੈਂਬਰ ਜੋੜੋ", payments: "ਭੁਗਤਾਨ", attendance: "ਹਾਜ਼ਰੀ", expenses: "ਖਰਚੇ", reports: "ਰਿਪੋਰਟਾਂ", setup: "ਜਿਮ ਸੈੱਟਅੱਪ", support: "ਸਹਾਇਤਾ", logout: "ਲੌਗਆਉਟ", settings: "ਖਾਤਾ ਸੈਟਿੰਗ" },
+    fr: { dashboard: "Tableau de bord", list: "Liste des membres", add: "Ajouter un membre", payments: "Paiements", attendance: "Présence", expenses: "Dépenses", reports: "Rapports", setup: "Configuration", support: "Support", logout: "Déconnexion", settings: "Paramètres" }
   };
 
   const currentT = t[currentLang] || t['en'];
@@ -32,6 +32,7 @@ function Sidebar({ currentLang = 'en' }) {
     { path: "/expenses", name: currentT.expenses, icon: <CreditCard size={20} /> },
     { path: "/reports", name: currentT.reports, icon: <BarChart3 size={20} /> },
     { path: "/setup", name: currentT.setup, icon: <Settings size={20} /> },
+    { path: "/settings", name: currentT.settings, icon: <Settings size={20} /> }, // ✅ Naya Settings Link
     { path: "/support", name: currentT.support, icon: <HelpCircle size={20} /> },
   ];
 
