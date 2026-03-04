@@ -1,11 +1,30 @@
-import React, { useState } from 'react';
-import { MessageCircle, Mail, Phone, ChevronDown, ChevronUp, HelpCircle, Copy, Check, Sparkles, LifeBuoy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageCircle, Mail, Phone, ChevronDown, ChevronUp, HelpCircle, Copy, Check, Sparkles, LifeBuoy, Globe, ShieldCheck } from 'lucide-react';
 
 export default function Support() {
   const [openFaq, setOpenFaq] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [userRegion, setUserRegion] = useState("Global");
+
+  // ✅ GLOBAL PLAN: Detect user region for personalized support experience
+  useEffect(() => {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone.includes("Asia/Calcutta") || timezone.includes("Asia/Kolkata")) {
+        setUserRegion("India");
+      }
+    } catch (e) {
+      console.error("Region detection error", e);
+    }
+  }, []);
 
   const emailId = "sayhello2gmi@gmail.com";
+  
+  // ✅ GLOBAL PLAN: International Standardized WhatsApp Routing
+  // Prefix '91' is mandatory for global reach without the '+' symbol in the URL string
+  const WHATSAPP_NUMBER = "918097481065";
+  const WHATSAPP_MSG = encodeURIComponent("Hello GYM Manager Support, I need technical assistance.");
+  const globalWhatsAppUrl = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${WHATSAPP_MSG}`;
 
   const handleCopyEmail = (e) => {
     e.preventDefault();
@@ -45,10 +64,16 @@ export default function Support() {
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-12 animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-2">
-          <Sparkles size={14} /> 24/7 Support Available
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
+            <Sparkles size={14} /> 24/7 Global Support
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400 text-[9px] font-bold uppercase tracking-widest">
+            <Globe size={10} /> Active Region: {userRegion}
+          </div>
         </div>
-        <h2 className="text-4xl font-black text-slate-900 italic uppercase tracking-tighter">
+        
+        <h2 className="text-4xl md:text-5xl font-black text-slate-900 italic uppercase tracking-tighter">
           Customer <span className="text-blue-600">Support</span>
         </h2>
         <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
@@ -58,9 +83,9 @@ export default function Support() {
 
       {/* Support Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* WhatsApp Support */}
+        {/* WhatsApp Support - Updated with Global Routing */}
         <a 
-          href="https://wa.me/918097481065" 
+          href={globalWhatsAppUrl} 
           target="_blank" 
           rel="noreferrer"
           className="bg-white p-8 rounded-[32px] border border-slate-100 flex items-center gap-6 hover:shadow-2xl hover:shadow-green-100 transition-all group relative overflow-hidden"
@@ -71,7 +96,7 @@ export default function Support() {
           </div>
           <div className="relative z-10">
             <h4 className="font-black text-slate-800 text-xl italic uppercase tracking-tight">WhatsApp Chat</h4>
-            <p className="text-slate-500 text-sm font-medium mt-1">Instant reply & technical help</p>
+            <p className="text-slate-500 text-sm font-medium mt-1">Priority technical assistance</p>
           </div>
         </a>
 
@@ -83,7 +108,7 @@ export default function Support() {
               <Mail size={32} />
             </div>
             <div>
-              <h4 className="font-black text-slate-800 text-xl italic uppercase tracking-tight">Email Us</h4>
+              <h4 className="font-black text-slate-800 text-xl italic uppercase tracking-tight">Official Email</h4>
               <p className="text-blue-600 font-bold text-xs mt-1 truncate max-w-[180px]">{emailId}</p>
             </div>
           </a>
@@ -102,13 +127,19 @@ export default function Support() {
 
       {/* FAQ Section */}
       <div className="bg-slate-50/50 p-8 md:p-12 rounded-[40px] border border-slate-100">
-        <div className="flex items-center gap-4 mb-10">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
-            <LifeBuoy className="text-blue-600" size={24} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
+              <LifeBuoy className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight">Knowledge Base</h3>
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Self-help Documentation</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight">Common Questions</h3>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Quick Solutions for you</p>
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2">
+            <ShieldCheck size={14} className="text-emerald-500" />
+            <span className="text-[10px] font-black uppercase text-slate-600">Verified System Solutions</span>
           </div>
         </div>
 
@@ -143,9 +174,14 @@ export default function Support() {
       </div>
 
       {/* Footer Info */}
-      <p className="text-center text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
-        Powered by GYM Manager India &bull; Version 2.0
-      </p>
+      <div className="text-center space-y-2">
+        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
+          Powered by GYM Manager India &bull; Global Operations v2.1
+        </p>
+        <p className="text-slate-300 text-[8px] font-bold uppercase tracking-[0.1em]">
+          Cloud Infrastructure Secured by Supabase Encryption
+        </p>
+      </div>
     </div>
   );
 }

@@ -62,9 +62,22 @@
     @apply px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-rose-100 text-rose-700 shadow-sm shadow-rose-100/50;
   }
 
-  /* 6. Dashboard Stat Card Glow (Add this class to your StatCards) */
+  /* 6. Dashboard Stat Card Glow */
   .stat-glow {
     @apply relative overflow-hidden after:absolute after:inset-0 after:bg-gradient-to-br after:from-white/20 after:to-transparent after:opacity-0 hover:after:opacity-100 after:transition-opacity;
+  }
+
+  /* 🌍 GLOBAL PHONE INPUT STYLING (Aapke Design ke Hisaab se) */
+  .global-phone-input-container {
+    @apply flex items-center bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-1.5 transition-all duration-300 focus-within:bg-white focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/5;
+  }
+
+  .global-phone-input-container .PhoneInputInput {
+    @apply bg-transparent border-none outline-none font-bold py-3 text-slate-700 w-full ml-2;
+  }
+
+  .global-phone-input-container .PhoneInputCountry {
+    @apply border-r border-slate-200 pr-3 flex items-center;
   }
 }
 

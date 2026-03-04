@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom"; 
 // ✅ AuthContext import kiya user data access karne ke liye
 import { useAuth } from "../context/AuthContext"; 
-import { PlusCircle, FileText, Users, ArrowUpRight, Sun, Moon, Sunrise, Sunset, Lightbulb, RefreshCw, Zap, TrendingUp, IndianRupee, Sparkles, Globe } from "lucide-react"; 
+import { PlusCircle, FileText, Users, ArrowUpRight, Sun, Moon, Sunrise, Sunset, Lightbulb, RefreshCw, Zap, TrendingUp, IndianRupee, Sparkles, Globe, Activity, Percent } from "lucide-react"; 
 import StatCard from "../components/ui/StatCard";
 import RevenueChart from "../components/ui/RevenueChart";
 import RecentActivity from "../components/ui/RecentActivity";
@@ -15,12 +15,17 @@ function Dashboard({ currentLang = 'en', setLang }) {
   const [gymName, setGymName] = useState("Your Gym"); 
   const [greeting, setGreeting] = useState({ text: "", icon: null }); 
 
+  // 🌍 Global Config State (Extra add kiya symbol handle karne ke liye)
+  const [config, setConfig] = useState({ lang: 'en', symbol: '₹', currency: 'INR' });
+
   const t = {
-    en: { welcome: "Dashboard", health: "AI Gym Health Score", add: "Add Member", suggest: "Suggest", status: "Operational", analysis: "AI Analysis: Revenue is predicted to grow.", retention: "Member Retention" },
-    hi: { welcome: "डैशबोर्ड", health: "AI जिम हेल्थ स्कोर", add: "सदस्य जोड़ें", suggest: "सुझाव", status: "सक्रिय", analysis: "AI विश्लेषण: अगले महीने आय बढ़ने की उम्मीद है।", retention: "सदस्य प्रतिधारण" },
-    mr: { welcome: "डॅशबोर्ड", health: "AI जिम हेल्थ स्कोअर", add: "सदस्य जोडा", suggest: "सुझाव", status: "कार्यरत", analysis: "AI विश्लेषण: पुढच्या महिन्यात महसूल वाढण्याची शक्यता आहे.", retention: "सदस्य टिकवून ठेवणे" },
-    pa: { welcome: "ਡੈਸ਼ਬੋਰਡ", health: "AI ਜਿਮ ਹੈਲਥ ਸਕੋਰ", add: "ਮੈਂਬਰ ਜੋੜੋ", suggest: "ਸੁਝਾਅ", status: "ਚਾਲੂ", analysis: "AI ਵਿਸ਼ਲੇਸ਼ਣ: ਅਗਲੇ ਮਹੀਨੇ ਆਮਦਨ ਵਧਣ ਦੀ ਉਮੀਦ ਹੈ।", retention: "ਮੈਂਬਰ ਧਾਰਨ" },
-    fr: { welcome: "Tableau de bord", health: "Score de santé IA", add: "Ajouter", suggest: "Suggérer", status: "Opérationnel", analysis: "Analyse IA : Le revenu devrait augmenter.", retention: "Rétention des membres" }
+    en: { welcome: "Dashboard", health: "AI Gym Health Score", add: "Add Member", suggest: "Suggest", status: "Operational", analysis: "AI Analysis: Revenue is predicted to grow.", retention: "Member Retention", insight: "AI INSIGHT", profit: "Profitability" },
+    hi: { welcome: "डैशबोर्ड", health: "AI जिम हेल्थ स्कोर", add: "सदस्य जोड़ें", suggest: "सुझाव", status: "सक्रिय", analysis: "AI विश्लेषण: अगले महीने आय बढ़ने की उम्मीद है।", retention: "सदस्य प्रतिधारण", insight: "AI जानकारी", profit: "मुनाफा" },
+    mr: { welcome: "डॅशबोर्ड", health: "AI जिम हेल्थ स्कोअर", add: "सदस्य जोडा", suggest: "सुझाव", status: "कार्यरत", analysis: "AI विश्लेषण: पुढच्या महिन्यात महसूल वाढण्याची शक्यता आहे.", retention: "सदस्य टिकवून ठेवणे", insight: "AI विश्लेषण", profit: "नफा" },
+    pa: { welcome: "ਡੈਸ਼ਬੋਰਡ", health: "AI ਜਿਮ ਹੈਲਥ ਸਕੋਰ", add: "ਮੈਂਬਰ ਜੋੜੋ", suggest: "ਸੁਝਾਅ", status: "ਚਾਲੂ", analysis: "AI ਵਿਸ਼ਲੇਸ਼ਣ: ਅਗਲੇ ਮਹੀਨੇ ਆਮਦਨ ਵਧਣ ਦੀ ਉਮੀਦ ਹੈ।", retention: "ਮੈਂਬਰ ਧਾਰਨ", insight: "AI ਸੂਝ", profit: "ਮੁਨਾਫਾ" },
+    fr: { welcome: "Tableau de bord", health: "Score de santé IA", add: "Ajouter", suggest: "Suggérer", status: "Opérationnel", analysis: "Analyse IA : Le revenu devrait augmenter.", retention: "Rétention des membres", insight: "APERÇU IA", profit: "Rentabilité" },
+    ar: { welcome: "لوحة القيادة", health: "درجة صحة النادي", add: "إضافة عضو", suggest: "اقتراح", status: "نشط", analysis: "تحليل الذكاء الاصطناعي: من المتوقع نمو الإيرادات.", retention: "الاحتفاظ بالأعضاء", insight: "بصيرة الذكاء الاصطناعي", profit: "الربحية" },
+    ru: { welcome: "Панель", health: "AI Показатель здоровья", add: "Добавить", suggest: "Совет", status: "Активно", analysis: "ИИ Анализ: Ожидается рост выручки.", retention: "Удержание", insight: "ИИ АНАЛИЗ", profit: "Прибыль" }
   };
 
   const currentT = t[currentLang] || t['en'];
@@ -31,7 +36,8 @@ function Dashboard({ currentLang = 'en', setLang }) {
     totalTrainers: 0, thisMonthRevenue: 0, totalRevenue: 0,
     // New fields for AI Logic
     aiScore: 88,
-    dynamicAnalysis: ""
+    dynamicAnalysis: "",
+    profitMargin: 0 // New field added
   });
 
   const [monthlyData, setMonthlyData] = useState([]);
@@ -39,6 +45,17 @@ function Dashboard({ currentLang = 'en', setLang }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 🌍 Global Sync: localStorage se config uthana
+    const savedConfig = localStorage.getItem("gym_config");
+    if (savedConfig) {
+      const parsed = JSON.parse(savedConfig);
+      setConfig(parsed);
+      // Agar config mein language hai toh parent state ko update karein
+      if (parsed.lang && parsed.lang !== currentLang) {
+        setLang(parsed.lang);
+      }
+    }
+
     // ✅ User session check karke gym name set karna
     if (user) {
       const name = user.user_metadata?.gym_name || "Your Gym";
@@ -91,12 +108,12 @@ function Dashboard({ currentLang = 'en', setLang }) {
       ] = await Promise.all([
         supabase
           .from("payments")
-          .select(`amount, payment_date, members (name)`)
+          .select(`amount, payment_date, members (name, phone)`)
           .eq('user_id', user.id)
           .order("payment_date", { ascending: false }),
         supabase
           .from("members")
-          .select("due_amount, expiry_date")
+          .select("due_amount, expiry_date, phone")
           .eq('user_id', user.id),
         supabase
           .from("expenses")
@@ -119,6 +136,9 @@ function Dashboard({ currentLang = 'en', setLang }) {
         return sum + (parseFloat(m.due_amount) || 0);
       }, 0) || 0;
 
+      // ✅ New Profit Margin Logic
+      const profit = totalRevenue > 0 ? ((totalRevenue - totalExpenses) / totalRevenue) * 100 : 0;
+
       // ✅ AI Score Logic (Based on active member ratio)
       const expiredCount = members?.filter(m => m.expiry_date < today).length || 0;
       const activeCount = (members?.length || 0) - expiredCount;
@@ -126,7 +146,7 @@ function Dashboard({ currentLang = 'en', setLang }) {
 
       // ✅ AI Analysis Text Logic
       let aiText = currentT.analysis;
-      if (thisMonthRevenue < totalExpenses) {
+      if (thisMonthRevenue < (totalExpenses / 12)) {
         aiText = currentLang === 'hi' ? "AI विश्लेषण: खर्च बढ़ रहे हैं, मेम्बरशिप रिन्यूअल पर ध्यान दें।" : "AI Analysis: Expenses exceed revenue, focus on renewals.";
       }
 
@@ -143,7 +163,8 @@ function Dashboard({ currentLang = 'en', setLang }) {
         expiry3Days: members?.filter(m => m.expiry_date >= today && m.expiry_date <= d3Str).length || 0,
         totalTrainers: trainers?.length || 0,
         aiScore: healthScore || 88,
-        dynamicAnalysis: aiText
+        dynamicAnalysis: aiText,
+        profitMargin: Math.max(0, Math.round(profit))
       });
 
       setRecentPayments(payments?.slice(0, 5) || []);
@@ -186,27 +207,39 @@ function Dashboard({ currentLang = 'en', setLang }) {
   return (
     <div className="space-y-6 md:space-y-8 pb-10 animate-page px-2 md:px-0 max-w-7xl mx-auto">
       
-      {/* AI Health Score Card */}
-      <div className="bg-gradient-to-br from-indigo-600 via-blue-700 to-purple-800 p-6 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-white/10">
-        <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-5">
-            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-              <Sparkles className="text-yellow-300 animate-pulse" size={32} />
-            </div>
-            <div>
-              <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] mb-1">{currentT.health}</p>
-              <div className="flex items-end gap-2">
-                <h2 className="text-5xl font-black italic">{stats.aiScore}<span className="text-xl opacity-50">/100</span></h2>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 uppercase tracking-tighter ${stats.aiScore > 70 ? 'bg-emerald-500' : 'bg-orange-500'}`}>
-                  {stats.aiScore > 70 ? 'Perfect' : 'Action Needed'}
-                </span>
+      {/* 🚀 AI Health & Profitability Gauge Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 via-blue-700 to-purple-800 p-6 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-white/10">
+          <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-5">
+              <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                <Sparkles className="text-yellow-300 animate-pulse" size={32} />
+              </div>
+              <div>
+                <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] mb-1">{currentT.health}</p>
+                <div className="flex items-end gap-2">
+                  <h2 className="text-5xl font-black italic">{stats.aiScore}<span className="text-xl opacity-50">/100</span></h2>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 uppercase tracking-tighter ${stats.aiScore > 70 ? 'bg-emerald-500' : 'bg-orange-500'}`}>
+                    {stats.aiScore > 70 ? 'Perfect' : 'Action Needed'}
+                  </span>
+                </div>
               </div>
             </div>
+            <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5 max-w-sm">
+               <p className="text-[11px] leading-relaxed font-medium text-indigo-50">✨ <span className="font-bold">AI INSIGHT:</span> {stats.dynamicAnalysis || currentT.analysis}</p>
+            </div>
           </div>
-          <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/5 max-w-sm">
-             <p className="text-[11px] leading-relaxed font-medium text-indigo-50">✨ <span className="font-bold">AI INSIGHT:</span> {stats.dynamicAnalysis || currentT.analysis}</p>
-          </div>
+        </div>
+
+        {/* 📊 Profitability Card */}
+        <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+            <Activity className="text-emerald-500 mb-2" size={24} />
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">{currentT.profit}</p>
+            <div className="text-4xl font-black text-slate-900 mb-2">{stats.profitMargin}%</div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${stats.profitMargin}%` }}></div>
+            </div>
         </div>
       </div>
 
@@ -221,9 +254,12 @@ function Dashboard({ currentLang = 'en', setLang }) {
               {greeting.text}, <span className="text-blue-600 block md:inline">{gymName}</span>
             </h2>
           </div>
-          <p className="text-[9px] md:text-xs text-slate-400 font-black uppercase tracking-widest ml-1 opacity-70">
-            {currentT.status}: <span className="text-emerald-500 font-bold">Operational</span> • {new Date().toLocaleDateString('en-GB')}
-          </p>
+          <div className="flex items-center gap-2 ml-1">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+            <p className="text-[9px] md:text-xs text-slate-400 font-black uppercase tracking-widest opacity-70">
+              {currentT.status}: <span className="text-emerald-500 font-bold">Operational</span> • {new Date().toLocaleDateString('en-GB')}
+            </p>
+          </div>
         </div>
         
         <div className="flex flex-row gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 items-center">
@@ -232,7 +268,12 @@ function Dashboard({ currentLang = 'en', setLang }) {
             <Globe size={14} className="text-slate-400" />
             <select 
               value={currentLang} 
-              onChange={(e) => setLang(e.target.value)}
+              onChange={(e) => {
+                const newLang = e.target.value;
+                setLang(newLang);
+                const newConfig = { ...config, lang: newLang };
+                localStorage.setItem("gym_config", JSON.stringify(newConfig));
+              }}
               className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-slate-700"
             >
               <option value="en">English</option>
@@ -240,6 +281,8 @@ function Dashboard({ currentLang = 'en', setLang }) {
               <option value="mr">मराठी</option>
               <option value="pa">ਪੰਜਾਬੀ</option>
               <option value="fr">French</option>
+              <option value="ar">العربية</option>
+              <option value="ru">Русский</option>
             </select>
           </div>
 
@@ -267,40 +310,35 @@ function Dashboard({ currentLang = 'en', setLang }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
-        <StatCard title="Today's Cash" value={`₹${stats.todayCollection.toLocaleString()}`} color="bg-emerald-500" />
-        <StatCard title="This Month" value={`₹${stats.thisMonthRevenue.toLocaleString()}`} color="bg-blue-600" />
-        <StatCard title="Life Revenue" value={`₹${stats.totalRevenue.toLocaleString()}`} color="bg-slate-900" />
-        <StatCard title="Total Dues" value={`₹${stats.totalDue.toLocaleString()}`} color="bg-rose-600" />
+        <StatCard title="Today's Cash" value={`${config.symbol}${stats.todayCollection.toLocaleString()}`} color="bg-emerald-500" />
+        <StatCard title="This Month" value={`${config.symbol}${stats.thisMonthRevenue.toLocaleString()}`} color="bg-blue-600" />
+        <StatCard title="Life Revenue" value={`${config.symbol}${stats.totalRevenue.toLocaleString()}`} color="bg-slate-900" />
+        <StatCard title="Total Dues" value={`${config.symbol}${stats.totalDue.toLocaleString()}`} color="bg-rose-600" />
         <StatCard title="Expired Now" value={stats.expiredMembers} color="bg-red-500" />
         <StatCard title="All Members" value={stats.totalMembers} color="bg-indigo-600" />
         <StatCard title="Staff/Trainers" value={stats.totalTrainers} color="bg-purple-600" />
         <StatCard title="Alert (3 Days)" value={stats.expiry3Days} color="bg-orange-500" />
         <StatCard title="Warning (7 Days)" value={stats.expiry7Days} color="bg-amber-500" />
-        <StatCard title="All Expenses" value={`₹${stats.totalExpenses.toLocaleString()}`} color="bg-slate-500" />
+        <StatCard title="All Expenses" value={`${config.symbol}${stats.totalExpenses.toLocaleString()}`} color="bg-slate-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         <div className="lg:col-span-3 space-y-6 w-full min-w-0">
             <div className="bg-white p-4 md:p-6 rounded-[24px] border border-slate-100 shadow-sm relative overflow-hidden flex flex-col">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-emerald-500"></div>
-              
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                    <TrendingUp size={20} />
-                  </div>
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl shrink-0"><TrendingUp size={20} /></div>
                   <div>
-                    <h3 className="font-black text-slate-800 uppercase tracking-tight italic text-base md:text-xl">Revenue Analytics</h3>
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight italic text-base md:text-xl">Revenue Analytics ({config.currency})</h3>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Trend Matrix</p>
                   </div>
                 </div>
-
                 <div className="hidden sm:flex items-center gap-2 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg border border-emerald-100">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                   <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest">Live</span>
                 </div>
               </div>
-
               <div className="w-full flex-1 min-h-[250px] md:min-h-[400px] bg-slate-50/20 rounded-xl p-1 md:p-2 relative">
                 <RevenueChart data={monthlyData} />
               </div>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { Plus, Trash2, Loader2, Edit2, Eye, X, Save, Clock, IndianRupee, Layers, ShieldCheck, Sparkles } from "lucide-react";
+// ✅ Global utilities import kiye
+import { formatCurrency } from "../../lib/utils"; 
+import { Plus, Trash2, Loader2, Edit2, Eye, X, Save, Clock, Layers, ShieldCheck, Sparkles } from "lucide-react";
 
 function MembershipPlans() {
   const [plans, setPlans] = useState([]);
@@ -10,6 +12,9 @@ function MembershipPlans() {
   const [modalType, setModalType] = useState(null);
 
   const [form, setForm] = useState({ name: "", duration_months: "", price: "", badge: "" });
+
+  // 🌍 Dynamic Currency Symbol for labels (e.g., "Price ($)")
+  const currencySymbol = formatCurrency(0).replace(/[0-9.,\s]/g, '');
 
   const badgeOptions = [
     { label: "None", value: "", color: "bg-slate-100 text-slate-500" },
@@ -40,7 +45,6 @@ function MembershipPlans() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not found");
 
-      // FIX: Added Number validation to prevent "" (empty string) error
       const payload = { 
         ...form, 
         duration_months: parseInt(form.duration_months) || 0, 
@@ -55,7 +59,6 @@ function MembershipPlans() {
       setForm({ name: "", duration_months: "", price: "", badge: "" }); 
       setShowForm(false); 
       fetchPlans(); 
-      alert("Plan added successfully!");
     } catch (err) {
       console.error(err);
       alert("Error adding plan: " + err.message);
@@ -83,7 +86,6 @@ function MembershipPlans() {
         .from("membership_plans")
         .update({
           name: selectedPlan.name,
-          // FIX: Added Number validation here too
           duration_months: parseInt(selectedPlan.duration_months) || 0,
           price: parseFloat(selectedPlan.price) || 0,
           badge: selectedPlan.badge 
@@ -95,7 +97,6 @@ function MembershipPlans() {
       
       setModalType(null); 
       fetchPlans();
-      alert("Plan updated successfully!");
     } catch (err) {
       console.error(err);
       alert("Error updating plan: " + err.message);
@@ -112,7 +113,7 @@ function MembershipPlans() {
           <h3 className="text-xl md:text-2xl font-black text-slate-800 italic uppercase tracking-tight leading-none flex items-center gap-2">
             Membership Plans <ShieldCheck size={18} className="text-emerald-500" />
           </h3>
-          <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Configure your private gym packages</p>
+          <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Configure your gym packages</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 ${showForm ? 'bg-slate-100 text-slate-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
           {showForm ? <X size={16} /> : <Plus size={16} />} {showForm ? "Cancel" : "Create Plan"}
@@ -131,7 +132,8 @@ function MembershipPlans() {
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" type="number" value={form.duration_months} onChange={(e) => setForm({ ...form, duration_months: e.target.value })} required />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price (₹)</label>
+            {/* ✅ Label adjusted for Global Currency */}
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price ({currencySymbol})</label>
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
           </div>
           <div className="space-y-1">
@@ -142,7 +144,7 @@ function MembershipPlans() {
           </div>
           <div className="flex items-end">
             <button disabled={loading} className="w-full bg-slate-900 text-white rounded-xl py-3.5 font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="animate-spin" size={18} /> : <><Save size={16}/> Save</>}
+              {loading ? <Loader2 className="animate-spin" size={18} /> : <><Save size={16}/> Save Plan</>}
             </button>
           </div>
         </form>
@@ -150,8 +152,12 @@ function MembershipPlans() {
 
       {/* Plans List */}
       <div className="grid grid-cols-1 gap-4">
-        {plans.length > 0 ? plans.map((plan) => (
-          <div key={plan.id} className="group flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 border border-slate-100 rounded-[24px] bg-white hover:border-blue-200 hover:shadow-xl transition-all gap-4 relative overflow-hidden">
+        {plans.length > 0 ? plans.map((plan, index) => (
+          <div 
+            key={plan.id} 
+            style={{ animationDelay: `${index * 50}ms` }}
+            className="group flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 border border-slate-100 rounded-[24px] bg-white hover:border-blue-200 hover:shadow-xl transition-all gap-4 relative overflow-hidden animate-in fade-in slide-in-from-bottom-2"
+          >
             <div className="flex items-center gap-4 md:gap-5">
               <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg group-hover:bg-blue-600 transition-colors shrink-0">
                 <Layers size={20} />
@@ -166,7 +172,7 @@ function MembershipPlans() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-tighter mt-0.5">
-                  <Clock size={12} /> {plan.duration_months} Months
+                  <Clock size={12} /> {plan.duration_months} {plan.duration_months === 1 ? 'Month' : 'Months'}
                 </div>
               </div>
             </div>
@@ -175,25 +181,29 @@ function MembershipPlans() {
               <div className="flex flex-col items-start md:items-end">
                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Price</span>
                 <span className="text-xl md:text-2xl font-black text-blue-600 italic flex items-center tracking-tighter">
-                  <IndianRupee size={16} strokeWidth={3} />{plan.price?.toLocaleString()}
+                  {/* ✅ Global Currency Formatter used */}
+                  {formatCurrency(plan.price)}
                 </span>
               </div>
               <div className="flex bg-slate-50 p-1 rounded-2xl gap-1">
-                <button onClick={() => { setSelectedPlan(plan); setModalType('view'); }} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all"><Eye size={18}/></button>
-                <button onClick={() => { setSelectedPlan(plan); setModalType('edit'); }} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-xl transition-all"><Edit2 size={16}/></button>
-                <button onClick={() => handleDelete(plan.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl transition-all"><Trash2 size={18}/></button>
+                <button onClick={() => { setSelectedPlan(plan); setModalType('view'); }} title="View Plan" className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all"><Eye size={18}/></button>
+                <button onClick={() => { setSelectedPlan(plan); setModalType('edit'); }} title="Edit Plan" className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-xl transition-all"><Edit2 size={16}/></button>
+                <button onClick={() => handleDelete(plan.id)} title="Delete Plan" className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl transition-all"><Trash2 size={18}/></button>
               </div>
             </div>
           </div>
         )) : (
-          <div className="text-center py-20 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
-             <Layers className="mx-auto text-slate-200 mb-4" size={48} />
-             <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No plans found</p>
+          <div className="text-center py-20 bg-slate-50/50 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
+             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                <Layers className="text-slate-300" size={32} />
+             </div>
+             <p className="text-slate-500 font-black uppercase text-sm tracking-widest">No plans found</p>
+             <p className="text-slate-400 text-[10px] uppercase font-bold mt-1">Start by adding your first gym package</p>
           </div>
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal Section */}
       {modalType && selectedPlan && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[40px] w-full max-w-md p-6 md:p-8 shadow-2xl relative animate-in zoom-in-95">
@@ -216,7 +226,8 @@ function MembershipPlans() {
                   <input type="number" disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold" value={selectedPlan.duration_months} onChange={(e) => setSelectedPlan({...selectedPlan, duration_months: e.target.value})} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price (₹)</label>
+                  {/* ✅ Modal Label adjusted for Global Currency */}
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price ({currencySymbol})</label>
                   <input type="number" disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-blue-600" value={selectedPlan.price} onChange={(e) => setSelectedPlan({...selectedPlan, price: e.target.value})} />
                 </div>
               </div>

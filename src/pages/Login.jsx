@@ -1,32 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { LogIn, Lock, Mail, AlertCircle, Building, Phone, UserPlus, KeyRound } from 'lucide-react';
+import { LogIn, Lock, Mail, AlertCircle, Building, Phone, UserPlus, Globe } from 'lucide-react';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState('login'); // login, register, forgot
+  const [mode, setMode] = useState('login'); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const navigate = useNavigate();
 
-  // Form States
+  // 🌍 Global Markets Config
+  const [selectedCountry, setSelectedCountry] = useState("IN");
+  const markets = [
+    { code: "IN", name: "India", lang: "en", currency: "INR", symbol: "₹" },
+    { code: "US", name: "USA", lang: "en", currency: "USD", symbol: "$" },
+    { code: "AE", name: "Dubai", lang: "ar", currency: "AED", symbol: "د.إ" },
+    { code: "SG", name: "Singapore", lang: "en", currency: "SGD", symbol: "S$" },
+    { code: "FR", name: "France", lang: "fr", currency: "EUR", symbol: "€" },
+    { code: "DE", name: "Germany", lang: "de", currency: "EUR", symbol: "€" },
+    { code: "PL", name: "Poland", lang: "pl", currency: "PLN", symbol: "zł" },
+    { code: "RU", name: "Russia", lang: "ru", currency: "RUB", symbol: "₽" },
+    { code: "CA", name: "Canada", lang: "en", currency: "CAD", symbol: "$" },
+  ];
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [gymName, setGymName] = useState('');
   const [phone, setPhone] = useState('');
 
-  // ✅ Check if user is already logged in to prevent viewing AuthPage
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/dashboard', { replace: true });
-      }
+      if (session) navigate('/dashboard', { replace: true });
     };
     checkUser();
   }, [navigate]);
+
+  // ✅ Helper to save global config
+  const saveGlobalConfig = () => {
+    const market = markets.find(m => m.code === selectedCountry);
+    localStorage.setItem("gym_config", JSON.stringify(market));
+    localStorage.setItem("gym_country", market.code); // For backward compatibility
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -34,47 +51,45 @@ export default function AuthPage() {
     setError(null);
     setMessage(null);
 
+    // Save configuration before proceeding
+    saveGlobalConfig();
+
     if (mode === 'register') {
-      // 1. Register User in Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: name,
-            gym_name: gymName, // Ye hi username ki tarah treat hoga
-            phone: phone
+            gym_name: gymName,
+            phone: phone,
+            country: selectedCountry // Store country in user metadata
           }
         }
       });
       if (signUpError) setError(signUpError.message);
       else setMessage("Registration successful! Please check your email for verification.");
     } 
-    
     else if (mode === 'login') {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) setError(signInError.message);
-      else {
-        // ✅ Using replace: true to clean history
-        navigate('/dashboard', { replace: true });
-      }
+      else navigate('/dashboard', { replace: true });
     }
-
     else if (mode === 'forgot') {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
       if (resetError) setError(resetError.message);
       else setMessage("Password reset link sent to your email!");
     }
-
     setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden transition-all">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden transition-all border border-slate-700/10">
         <div className="p-8">
+          
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <div className="bg-blue-600 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3 shadow-lg">
               {mode === 'register' ? <UserPlus className="text-white" size={28} /> : <Lock className="text-white" size={28} />}
             </div>
@@ -83,14 +98,29 @@ export default function AuthPage() {
               {mode === 'register' && "Create Account"}
               {mode === 'forgot' && "Reset Password"}
             </h2>
-            <p className="text-slate-500 text-sm mt-1">Gym Manager Pro</p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
-            {error && <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs flex items-center gap-2 border border-rose-100"><AlertCircle size={16}/>{error}</div>}
-            {message && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs flex items-center gap-2 border border-green-100">Check your email!</div>}
+            
+            {/* 🌍 Global Market Selector (New Section) */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-6">
+              <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 mb-2">
+                <Globe size={12}/> Select Your Market
+              </label>
+              <select 
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="w-full bg-transparent font-bold text-slate-700 outline-none cursor-pointer text-sm"
+              >
+                {markets.map(m => (
+                  <option key={m.code} value={m.code}>{m.name} ({m.currency})</option>
+                ))}
+              </select>
+            </div>
 
-            {/* Registration Fields */}
+            {error && <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs flex items-center gap-2 border border-rose-100"><AlertCircle size={16}/>{error}</div>}
+            {message && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs border border-green-100">Check your email!</div>}
+
             {mode === 'register' && (
               <>
                 <div className="space-y-1">
@@ -101,23 +131,22 @@ export default function AuthPage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Gym Name (Username)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Gym Name</label>
                   <div className="relative">
                     <Building className="absolute left-3 top-3 text-slate-400" size={16} />
                     <input type="text" required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Power Gym" value={gymName} onChange={(e)=>setGymName(e.target.value)} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Phone Number</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Phone</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-3 text-slate-400" size={16} />
-                    <input type="text" required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="9876543210" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+                    <input type="text" required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Contact No." value={phone} onChange={(e)=>setPhone(e.target.value)} />
                   </div>
                 </div>
               </>
             )}
 
-            {/* Common Fields (Email) */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email Address</label>
               <div className="relative">
@@ -126,7 +155,6 @@ export default function AuthPage() {
               </div>
             </div>
 
-            {/* Password Field (Login & Register only) */}
             {mode !== 'forgot' && (
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
@@ -140,26 +168,25 @@ export default function AuthPage() {
               </div>
             )}
 
-            <button disabled={loading} className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3 rounded-xl transition-all mt-4 flex justify-center items-center gap-2 shadow-lg">
-              {loading ? "Processing..." : (
+            <button disabled={loading} className="w-full bg-slate-900 hover:bg-black text-white font-black uppercase tracking-widest text-xs py-4 rounded-xl transition-all mt-4 shadow-lg active:scale-[0.98]">
+              {loading ? "Initializing..." : (
                 <>
-                  {mode === 'login' && "Login"}
-                  {mode === 'register' && "Register Now"}
+                  {mode === 'login' && `Login to ${selectedCountry} Office`}
+                  {mode === 'register' && "Start Global Empire"}
                   {mode === 'forgot' && "Send Reset Link"}
                 </>
               )}
             </button>
           </form>
 
-          {/* Footer Links */}
-          <div className="mt-6 text-center space-y-3">
+          <div className="mt-6 text-center">
             {mode === 'login' ? (
-              <p className="text-sm text-slate-500">
-                New to Gym Manager? <button onClick={()=>setMode('register')} className="text-blue-600 font-bold hover:underline">Register Now</button>
+              <p className="text-sm text-slate-500 font-medium">
+                New to the platform? <button onClick={()=>setMode('register')} className="text-blue-600 font-bold">Register Now</button>
               </p>
             ) : (
-              <p className="text-sm text-slate-500">
-                Already have an account? <button onClick={()=>setMode('login')} className="text-blue-600 font-bold hover:underline">Login Here</button>
+              <p className="text-sm text-slate-500 font-medium">
+                Already registered? <button onClick={()=>setMode('login')} className="text-blue-600 font-bold">Login Here</button>
               </p>
             )}
           </div>

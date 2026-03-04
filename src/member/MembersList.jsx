@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { Search, Loader2, MoreVertical, MessageCircle, Edit2, RefreshCw, Eye, Trash2, X, Download, Send, Phone, Calendar, Mail, Clock, ShieldCheck, Filter, AlertTriangle } from "lucide-react";
+import { Search, Loader2, MoreVertical, MessageCircle, Edit2, RefreshCw, Eye, Trash2, X, Download, Send, Phone, Calendar, Mail, Clock, ShieldCheck, Filter, AlertTriangle, Globe } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 export default function MembersList() {
@@ -22,7 +22,7 @@ export default function MembersList() {
   const [duePayment, setDuePayment] = useState("");
   const [customMessage, setCustomMessage] = useState("");
 
-  const [editFormData, setEditFormData] = useState({ name: "", phone: "", plan_id: "" });
+  const [editFormData, setEditFormData] = useState({ name: "", phone: "", plan_id: "", email: "" }); // Email added here
   const [renewPlanId, setRenewPlanId] = useState("");
 
   const today = new Date().toISOString().split('T')[0];
@@ -31,6 +31,16 @@ export default function MembersList() {
     fetchMembers();
     getGymInfo();
   }, []);
+
+  // Country code ke basis pe currency symbol decide karne ke liye
+  const getCurrencySymbol = (phone) => {
+    if (!phone) return "₹"; // Default
+    if (phone.startsWith("+1")) return "$"; // USA/Canada
+    if (phone.startsWith("+44")) return "£"; // UK
+    if (phone.startsWith("+971")) return "AED "; // UAE
+    if (phone.startsWith("+61")) return "A$"; // Australia
+    return "₹"; // Default for India (+91) or others
+  };
 
   const calculateRemainingDays = (expiryDate) => {
     const todayDate = new Date();
@@ -80,7 +90,6 @@ export default function MembersList() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ✅ FIXED: HISTORY ADDING LOGIC (Added plan_price to satisfy database constraints)
   const handleCollectDue = async () => {
     const amount = Number(duePayment);
     if (amount <= 0 || amount > selectedMember.due_amount) {
@@ -92,7 +101,6 @@ export default function MembersList() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User session not found");
 
-      // 1. Update Member
       const { error: updateError } = await supabase.from("members").update({
         due_amount: Number(selectedMember.due_amount) - amount,
         paid_amount: (Number(selectedMember.paid_amount) || 0) + amount
@@ -100,29 +108,22 @@ export default function MembersList() {
 
       if (updateError) throw updateError;
 
-      // 2. Insert Payment Record into 'payments' table
       const { error: paymentError } = await supabase.from("payments").insert([{
         member_id: selectedMember.id,
         user_id: user.id,
         amount: amount,
-        plan_price: amount, // Added to fix "null value violates not-null constraint"
+        plan_price: amount,
         payment_date: today,
         payment_mode: "Due Collection"
       }]);
 
-      if (paymentError) {
-        console.error("Payment Insert Error:", paymentError);
-        alert(`Due cut gaya par history add nahi hui: ${paymentError.message}`);
-      } else {
-        alert("Payment Success & History Updated! 💪");
-      }
+      if (paymentError) throw paymentError;
 
+      alert("Payment Success & History Updated! 💪");
       fetchMembers();
       setShowDueModal(false);
       setDuePayment("");
-      
     } catch (error) {
-      console.error(error);
       alert("Error: " + error.message);
     }
   };
@@ -133,7 +134,8 @@ export default function MembersList() {
       .update({ 
         name: editFormData.name, 
         phone: editFormData.phone, 
-        plan_id: editFormData.plan_id 
+        plan_id: editFormData.plan_id,
+        email: editFormData.email // Email update support
       })
       .eq("id", selectedMember.id);
 
@@ -151,19 +153,34 @@ export default function MembersList() {
     const newExpiry = new Date();
     newExpiry.setMonth(newExpiry.getMonth() + (selectedPlan.duration || 1));
 
-    const { error } = await supabase
-      .from("members")
-      .update({ 
-        plan_id: renewPlanId,
-        expiry_date: newExpiry.toISOString().split('T')[0],
-        status: 'active'
-      })
-      .eq("id", selectedMember.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error: updateError } = await supabase
+        .from("members")
+        .update({ 
+          plan_id: renewPlanId,
+          expiry_date: newExpiry.toISOString().split('T')[0],
+          status: 'active'
+        })
+        .eq("id", selectedMember.id);
 
-    if (!error) {
-      alert("Membership Renewed!");
+      if (updateError) throw updateError;
+
+      await supabase.from("payments").insert([{
+        member_id: selectedMember.id,
+        user_id: user.id,
+        amount: selectedPlan.price,
+        plan_price: selectedPlan.price,
+        payment_date: today,
+        payment_mode: "Renewal"
+      }]);
+
+      alert("Membership Renewed & History Added!");
       setShowRenewModal(false);
       fetchMembers();
+    } catch (error) {
+      alert("Error renewing: " + error.message);
     }
   };
 
@@ -183,7 +200,7 @@ export default function MembersList() {
 
   const exportToExcel = () => {
     const exportData = filteredMembers.map(m => ({
-      "Name": m.name, "Phone": m.phone, "Expiry": m.expiry_date, "Plan": m.membership_plans?.name, "Due": m.due_amount, "Status": m.status || 'active'
+      "Name": m.name, "Phone": m.phone, "Email": m.email, "Expiry": m.expiry_date, "Plan": m.membership_plans?.name, "Due": m.due_amount, "Status": m.status || 'active'
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -191,21 +208,36 @@ export default function MembersList() {
     XLSX.writeFile(wb, `${gymName}_Members.xlsx`);
   };
 
+  // ✅ GLOBAL WHATSAPP SEND (Works for any country)
   const handleWhatsAppSend = (type, member = selectedMember) => {
     let msg = "";
-    if (type === "welcome") msg = `Hi ${member.name}, Welcome to ${gymName}! 💪 Hum khushi mehsoos kar rahe hain ki aapne humein chuna. Let's get fit!`;
-    else if (type === "expiry") msg = `Hi ${member.name}, aapki ${gymName} ki membership ${member.expiry_date} ko expire ho rahi hai. Please timely renew karwa lein.`;
-    else if (type === "payment") msg = `Hi ${member.name}, ye aapke pending dues ₹${member.due_amount} ke liye reminder hai. Please ise clear kar dein.`;
+    if (type === "welcome") msg = `Hi ${member.name}, Welcome to ${gymName}! 💪 We're thrilled to have you. Let's get fit!`;
+    else if (type === "expiry") msg = `Hi ${member.name}, your membership at ${gymName} expires on ${member.expiry_date}. Please renew on time to avoid disruption.`;
+    else if (type === "payment") msg = `Hi ${member.name}, this is a reminder for your pending dues of ₹${member.due_amount}. Please clear them at your earliest.`;
     else if (type === "custom") msg = customMessage;
 
     if (msg) {
-        window.open(`https://wa.me/91${member.phone}?text=${encodeURIComponent(msg)}`, "_blank");
+        // Cleaning phone number to ensure it works globally
+        const cleanPhone = member.phone.replace(/\+/g, '').replace(/\s/g, '');
+        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, "_blank");
         if(type === "custom") {
             setCustomMessage("");
             setShowWhatsAppModal(false);
         }
     }
   };
+
+  // ✅ EMAIL SEND LOGIC
+  const sendEmailReminder = (member) => {
+  if (!member.email) {
+    alert("Is member ka email save nahi hai!");
+    return;
+  }
+  const subject = encodeURIComponent("Membership Renewal Reminder - Gym");
+  const body = encodeURIComponent(`Hi ${member.name},\n\nThis is a reminder that your gym membership is expiring on ${formatDate(member.expiry_date)}. Please renew it to continue your workout.\n\nThanks!`);
+  
+  window.location.href = `mailto:${member.email}?subject=${subject}&body=${body}`;
+};
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.phone?.includes(searchTerm);
@@ -277,7 +309,7 @@ export default function MembersList() {
                   <tr>
                     <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Member</th>
                     <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Validity</th>
-                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status & Mobile</th>
+                    <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status & Info</th>
                     <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
@@ -306,7 +338,10 @@ export default function MembersList() {
                           </div>
                         </td>
                         <td className="p-4">
-                            <p className="text-xs font-bold text-slate-700 mb-1">{m.phone}</p>
+                            <div className="flex items-center gap-2 mb-1">
+                                <p className="text-xs font-bold text-slate-700">{m.phone}</p>
+                                {m.email && <Mail size={10} className="text-slate-300" />}
+                            </div>
                             <button onClick={() => handleStatusToggle(m.id, m.status || 'active')} className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${m.status === 'inactive' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                              {m.status === 'inactive' ? "● Inactive" : "● Active"}
                             </button>
@@ -316,8 +351,8 @@ export default function MembersList() {
                           {activeMenu === m.id && (
                             <div className="absolute right-12 top-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 py-1 text-left animate-in zoom-in duration-150">
                               <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-xs font-bold"><Eye size={14} className="text-blue-500"/> View Profile</button>
-                              <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id}); setShowEditModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-xs font-bold border-t border-slate-50"><Edit2 size={14} className="text-slate-500"/> Edit Profile</button>
-                              <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-green-50 text-green-600 text-xs font-black border-t border-slate-50"><MessageCircle size={14}/> WhatsApp</button>
+                              <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id, email: m.email || ""}); setShowEditModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-xs font-bold border-t border-slate-50"><Edit2 size={14} className="text-slate-500"/> Edit Profile</button>
+                              <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-green-50 text-green-600 text-xs font-black border-t border-slate-50"><MessageCircle size={14}/> Connect / Reminder</button>
                               <button onClick={() => { setSelectedMember(m); setRenewPlanId(m.plan_id); setShowRenewModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-blue-600 text-xs font-black border-t border-slate-50"><RefreshCw size={14}/> Renew Plan</button>
                               <button onClick={() => { setSelectedMember(m); setShowDueModal(true); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 text-orange-600 text-xs font-black border-t border-slate-50"><Download size={14} className="rotate-180"/> Collect Due</button>
                               <button onClick={() => { deleteMember(m.id); setActiveMenu(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-rose-50 text-rose-500 text-xs font-bold border-t border-slate-50"><Trash2 size={14}/> Remove</button>
@@ -346,8 +381,8 @@ export default function MembersList() {
                     {activeMenu === m.id && (
                         <div className="absolute right-4 mt-32 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-40 py-1">
                           <button onClick={() => { setSelectedMember(m); setShowViewModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-slate-700 border-b border-slate-50">View Profile</button>
-                          <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-black text-green-600 border-b border-slate-50">WhatsApp</button>
-                          <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id}); setShowEditModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-slate-700 border-b border-slate-50">Edit</button>
+                          <button onClick={() => { setSelectedMember(m); setShowWhatsAppModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-black text-green-600 border-b border-slate-50">WhatsApp / Email</button>
+                          <button onClick={() => { setSelectedMember(m); setEditFormData({name: m.name, phone: m.phone, plan_id: m.plan_id, email: m.email || ""}); setShowEditModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-slate-700 border-b border-slate-50">Edit</button>
                           <button onClick={() => { setSelectedMember(m); setRenewPlanId(m.plan_id); setShowRenewModal(true); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-black text-blue-600 border-b border-slate-50">Renew</button>
                           <button onClick={() => { deleteMember(m.id); setActiveMenu(null); }} className="w-full px-4 py-3 text-xs font-bold text-rose-500">Delete</button>
                         </div>
@@ -383,6 +418,7 @@ export default function MembersList() {
               </div>
               <div className="space-y-4 text-sm font-bold text-slate-600">
                 <div className="flex justify-between border-b pb-2"><span>Mobile</span><span>{selectedMember.phone}</span></div>
+                <div className="flex justify-between border-b pb-2"><span>Email</span><span className="text-xs truncate max-w-[150px]">{selectedMember.email || "N/A"}</span></div>
                 <div className="flex justify-between border-b pb-2"><span>Expiry</span><span>{selectedMember.expiry_date}</span></div>
                 <div className="flex justify-between border-b pb-2"><span>Plan</span><span>{selectedMember.membership_plans?.name}</span></div>
               </div>
@@ -399,7 +435,8 @@ export default function MembersList() {
             <h2 className="text-xl font-black text-slate-900 italic uppercase mb-6">Edit Profile</h2>
             <div className="space-y-4">
               <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Name" value={editFormData.name} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} />
-              <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Phone" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})} />
+              <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Phone (with country code)" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})} />
+              <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" placeholder="Email Address" value={editFormData.email} onChange={(e) => setEditFormData({...editFormData, email: e.target.value})} />
               <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm" value={editFormData.plan_id} onChange={(e) => setEditFormData({...editFormData, plan_id: e.target.value})}>
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -412,7 +449,7 @@ export default function MembersList() {
         </div>
       )}
 
-      {/* 🔄 Renew Modal */}
+      {/* 🔄 Renew Modal - Dynamic Currency */}
       {showRenewModal && selectedMember && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in">
@@ -425,7 +462,11 @@ export default function MembersList() {
               <p className="text-[10px] font-black text-slate-400 uppercase mb-[-10px]">Select New Plan</p>
               <select className="w-full px-4 py-4 bg-slate-50 border-2 border-blue-50 rounded-2xl outline-none focus:border-blue-500 font-black text-sm" value={renewPlanId} onChange={(e) => setRenewPlanId(e.target.value)}>
                 <option value="">Choose Plan...</option>
-                {plans.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
+                {plans.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} - {getCurrencySymbol(selectedMember.phone)}{p.price}
+                  </option>
+                ))}
               </select>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowRenewModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
@@ -436,20 +477,27 @@ export default function MembersList() {
         </div>
       )}
 
-      {/* 💰 Due Modal */}
+      {/* 💰 Due Modal - Dynamic Currency */}
       {showDueModal && selectedMember && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4"><RefreshCw size={30} /></div>
+              <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4"><Download size={30} className="rotate-180" /></div>
               <h2 className="text-xl font-black text-slate-900 italic uppercase">Collect Due</h2>
             </div>
             <div className="space-y-4">
               <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase">Outstanding</span>
-                <span className="text-lg font-black text-rose-500 italic">₹{selectedMember.due_amount}</span>
+                <span className="text-lg font-black text-rose-500 italic">
+                  {getCurrencySymbol(selectedMember.phone)}{selectedMember.due_amount}
+                </span>
               </div>
-              <input type="number" className="w-full px-4 py-4 bg-slate-50 border-2 border-orange-100 rounded-2xl outline-none focus:border-orange-500 font-black text-lg text-center" placeholder="Amount" value={duePayment} onChange={(e) => setDuePayment(e.target.value)} />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-700">
+                  {getCurrencySymbol(selectedMember.phone)}
+                </span>
+                <input type="number" className="w-full pl-10 pr-4 py-4 bg-slate-50 border-2 border-orange-100 rounded-2xl outline-none focus:border-orange-500 font-black text-lg" placeholder="Amount" value={duePayment} onChange={(e) => setDuePayment(e.target.value)} />
+              </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowDueModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
                 <button onClick={handleCollectDue} className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-orange-100">Update</button>
@@ -458,31 +506,52 @@ export default function MembersList() {
           </div>
         </div>
       )}
-
-      {/* 📱 WhatsApp Modal */}
+      
+      {/* 📱 WhatsApp & Email Modal */}
       {showWhatsAppModal && selectedMember && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-sm p-6 shadow-2xl animate-in zoom-in">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-black text-slate-900 uppercase italic">WhatsApp Actions</h2>
+              <h2 className="text-lg font-black text-slate-900 uppercase italic">Notifications</h2>
               <button onClick={() => setShowWhatsAppModal(false)} className="text-slate-400"><X size={20}/></button>
             </div>
             <div className="space-y-3">
-              <button onClick={() => handleWhatsAppSend("welcome")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-100 rounded-2xl transition-all">
-                <span className="text-[10px] font-black uppercase text-slate-700">Welcome Message</span>
-                <Send size={14} className="text-emerald-500" />
-              </button>
-              <button onClick={() => handleWhatsAppSend("expiry")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-rose-50 border border-slate-100 rounded-2xl transition-all">
-                <span className="text-[10px] font-black uppercase text-slate-700">Expiry Reminder</span>
-                <Calendar size={14} className="text-rose-500" />
-              </button>
-              <button onClick={() => handleWhatsAppSend("payment")} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-orange-50 border border-slate-100 rounded-2xl transition-all">
-                <span className="text-[10px] font-black uppercase text-slate-700">Pending Due</span>
-                <ShieldCheck size={14} className="text-orange-500" />
-              </button>
+              {/* Row 1: Welcome */}
+              <div className="flex gap-2">
+                <button onClick={() => handleWhatsAppSend("welcome")} className="flex-1 flex items-center justify-between p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-100 rounded-2xl transition-all">
+                    <span className="text-[9px] font-black uppercase text-slate-700">Welcome WA</span>
+                    <Send size={14} className="text-emerald-500" />
+                </button>
+                <button onClick={() => handleEmailSend("welcome")} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">
+                    <Mail size={16} />
+                </button>
+              </div>
+
+              {/* Row 2: Expiry */}
+              <div className="flex gap-2">
+                <button onClick={() => handleWhatsAppSend("expiry")} className="flex-1 flex items-center justify-between p-4 bg-slate-50 hover:bg-rose-50 border border-slate-100 rounded-2xl transition-all">
+                    <span className="text-[9px] font-black uppercase text-slate-700">Expiry WA</span>
+                    <Calendar size={14} className="text-rose-500" />
+                </button>
+                <button onClick={() => handleEmailSend("expiry")} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">
+                    <Mail size={16} />
+                </button>
+              </div>
+
+              {/* Row 3: Payment */}
+              <div className="flex gap-2">
+                <button onClick={() => handleWhatsAppSend("payment")} className="flex-1 flex items-center justify-between p-4 bg-slate-50 hover:bg-orange-50 border border-slate-100 rounded-2xl transition-all">
+                    <span className="text-[9px] font-black uppercase text-slate-700">Payment WA</span>
+                    <ShieldCheck size={14} className="text-orange-500" />
+                </button>
+                <button onClick={() => handleEmailSend("payment")} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">
+                    <Mail size={16} />
+                </button>
+              </div>
+
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs min-h-[80px]" placeholder="Type custom message..." value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} />
-                <button onClick={() => handleWhatsAppSend("custom")} className="w-full mt-3 py-3 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100">Send Custom Msg</button>
+                <button onClick={() => handleWhatsAppSend("custom")} className="w-full mt-3 py-3 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-green-100">Send WhatsApp</button>
               </div>
             </div>
           </div>
