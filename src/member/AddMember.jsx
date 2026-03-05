@@ -3,7 +3,8 @@ import { supabase } from "../lib/supabase";
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { formatCurrency, formatDate } from "../lib/utils"; 
-// ✅ Added Mail icon in imports
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable"; 
 import { UserPlus, X, Loader2, History, Calendar, Percent, User, Phone, Users, CreditCard, ShieldCheck, ArrowRight, Smartphone, Banknote, Landmark, Globe, Mail } from "lucide-react";
 
 function AddMember() {
@@ -13,74 +14,136 @@ function AddMember() {
   const [payments, setPayments] = useState([]); 
   const [loading, setLoading] = useState(false);
   
-  const [userCountry, setUserCountry] = useState(() => {
-    try {
-      const locale = new Intl.DateTimeFormat().resolvedOptions().locale;
-      const code = locale.split('-')[1] || locale.split('_')[1];
-      return code ? code.toUpperCase() : "IN";
-    } catch (e) {
-      return "IN";
-    }
-  });
+  const [userCountry, setUserCountry] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const detectRegion = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const metaCountry = user?.user_metadata?.country_code || user?.user_metadata?.country;
+        if (metaCountry) {
+          const finalCode = metaCountry.length > 2 
+            ? (metaCountry.toLowerCase().includes('india') ? 'IN' : 'US') 
+            : metaCountry.toUpperCase();
+          setUserCountry(finalCode);
+        } else {
+          setUserCountry("IN"); 
+        }
+      } catch (e) {
+        setUserCountry("IN");
+      } finally {
+        setIsReady(true);
+      }
+    };
+    detectRegion();
+  }, []);
 
   const currencySymbol = formatCurrency(0).replace(/[0-9.,\s]/g, '');
 
   const [formData, setFormData] = useState({
-    name: "",
-    whatsapp: "", 
-    email: "", // ✅ 1. Added email to state
-    gender: "",
-    trainer_id: "",
-    plan_id: "",
+    name: "", whatsapp: "", email: "", gender: "", trainer_id: "", plan_id: "",
     joining_date: new Date().toISOString().split("T")[0],
-    expiry_date: "",
-    plan_price: 0,
-    discount_type: "Fixed",
-    discount_value: 0,
-    paid_amount: 0,
-    payment_mode: "Cash",
-    next_payment_date: "" 
+    expiry_date: "", plan_price: 0, discount_type: "Fixed",
+    discount_value: 0, paid_amount: 0, payment_mode: "Cash", next_payment_date: "" 
   });
 
-  // Fetch logic (Untouched)
+  // ✅ WhatsApp Helper Function
+  const sendWhatsAppWelcome = (member, amount, expiry) => {
+    const cleanPhone = member.phone.replace(/\D/g, ''); 
+    const selectedPlan = plans.find(p => p.id === member.plan_id);
+    
+    const message = `*Welcome to our Gym, ${member.name}!* 💪%0A%0A` +
+      `Your registration is successful.%0A%0A` +
+      `*Plan:* ${selectedPlan?.plan_name || 'Gym Membership'}%0A` +
+      `*Amount Paid:* ${formatCurrency(amount)}%0A` +
+      `*Valid Until:* ${formatDate(expiry)}%0A%0A` +
+      `Stay strong and see you soon! 🏋️‍♂️`;
+
+    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+  };
+
+  const generateInvoice = (member, paymentData) => {
+    const doc = new jsPDF();
+    const selectedPlan = plans.find(p => p.id === member.plan_id);
+    
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("GYM PAYMENT RECEIPT", 15, 25);
+    doc.setFontSize(10);
+    doc.text(`DATE: ${formatDate(new Date())}`, 160, 25);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text("BILL TO:", 15, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text(member.name.toUpperCase(), 15, 62);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Phone: ${member.phone}`, 15, 68);
+    doc.text(`Plan: ${selectedPlan?.plan_name || 'Membership'}`, 15, 74);
+
+    autoTable(doc, {
+      startY: 85,
+      head: [['Description', 'Payment Mode', 'Amount']],
+      body: [
+        ['Gym Membership Fees', paymentData.payment_mode, formatCurrency(paymentData.amount)],
+        ['Discount Applied', '-', `-${formatCurrency(paymentData.discount_value)}`],
+      ],
+      headStyles: { fillColor: [37, 99, 235], fontStyle: 'bold' },
+      theme: 'grid'
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(`Total Paid: ${formatCurrency(paymentData.amount)}`, 140, finalY);
+    
+    if (member.due_amount > 0) {
+        doc.setTextColor(220, 38, 38);
+        doc.text(`Due Balance: ${formatCurrency(member.due_amount)}`, 140, finalY + 8);
+    } else {
+        doc.setTextColor(16, 185, 129);
+        doc.text(`Status: FULLY PAID`, 140, finalY + 8);
+    }
+
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(9);
+    doc.text("Thank you for your business! Stay Strong.", 105, 280, { align: "center" });
+
+    doc.save(`Invoice_${member.name}.pdf`);
+  };
+
   const fetchPlans = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data, error } = await supabase.from("membership_plans").select("*").eq('user_id', user.id);
-    if (!error) setPlans(data);
+    const { data } = await supabase.from("membership_plans").select("*").eq('user_id', user.id);
+    if (data) setPlans(data);
   };
-
   const fetchTrainers = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data, error } = await supabase.from("trainers").select("*").eq('user_id', user.id);
-    if (!error) setTrainers(data);
+    const { data } = await supabase.from("trainers").select("*").eq('user_id', user.id);
+    if (data) setTrainers(data);
   };
-
   const fetchMembers = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data, error } = await supabase.from("members").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
-    if (!error) setMembers(data);
+    const { data } = await supabase.from("members").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
+    if (data) setMembers(data);
   };
-
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data, error } = await supabase
-      .from("payments")
-      .select(`*, members!fk_member_new(name)`) 
-      .eq('user_id', user.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    if (!error) setPayments(data);
+    const { data } = await supabase.from("payments").select("*, members!fk_member_new(name)").eq('user_id', user.id).order("created_at", { ascending: false }).limit(10);
+    if (data) setPayments(data);
   };
 
   useEffect(() => {
-    fetchPlans();
-    fetchTrainers();
-    fetchMembers();
-    fetchPayments();
+    fetchPlans(); fetchTrainers(); fetchMembers(); fetchPayments();
   }, []);
 
   const handlePlanChange = (planId) => {
@@ -89,76 +152,56 @@ function AddMember() {
       const duration = selectedPlan.duration_months || selectedPlan.duration || 1;
       const today = new Date(formData.joining_date);
       today.setMonth(today.getMonth() + parseInt(duration));
-      
       const formattedExpiry = today.toISOString().split("T")[0];
-      setFormData({
-        ...formData,
-        plan_id: planId,
-        plan_price: selectedPlan.price,
-        expiry_date: formattedExpiry,
-        next_payment_date: formattedExpiry 
-      });
+      setFormData({ ...formData, plan_id: planId, plan_price: selectedPlan.price, expiry_date: formattedExpiry, next_payment_date: formattedExpiry });
     }
   };
-  
+
   const currentDiscountValue = Number(formData.discount_value) || 0;
   const currentPlanPrice = Number(formData.plan_price) || 0;
   const currentPaidAmount = Number(formData.paid_amount) || 0;
-
   const finalPrice = formData.discount_type === "Percentage" 
     ? currentPlanPrice - (currentPlanPrice * currentDiscountValue / 100)
     : currentPlanPrice - currentDiscountValue;
-
   const dueAmount = finalPrice - currentPaidAmount;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if(!formData.whatsapp) return alert("Please enter a valid phone number");
-    
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Authentication required");
 
-      const { data: member, error: mError } = await supabase
-        .from("members")
-        .insert([{
-          user_id: user.id,
-          name: formData.name,
-          phone: formData.whatsapp, 
-          email: formData.email, // ✅ 2. Added email to insert
-          gender: formData.gender,
-          trainer_id: formData.trainer_id || null,
-          plan_id: formData.plan_id,
-          joining_date: formData.joining_date,
-          expiry_date: formData.next_payment_date, 
-          total_amount: finalPrice,
-          paid_amount: currentPaidAmount,
-          due_amount: dueAmount
-        }]).select();
+      const { data: member, error: mError } = await supabase.from("members").insert([{
+          user_id: user.id, name: formData.name, phone: formData.whatsapp, email: formData.email, gender: formData.gender,
+          trainer_id: formData.trainer_id || null, plan_id: formData.plan_id, joining_date: formData.joining_date,
+          expiry_date: formData.next_payment_date, total_amount: finalPrice, paid_amount: currentPaidAmount, due_amount: dueAmount
+      }]).select();
 
       if (mError) throw mError;
 
       if (currentPaidAmount > 0 && member && member[0]) {
-        const { error: pError } = await supabase.from("payments").insert([{
-          user_id: user.id,
-          member_id: member[0].id,
-          amount: currentPaidAmount,
-          payment_mode: formData.payment_mode,
-          payment_date: formData.joining_date,
-          plan_price: currentPlanPrice,
-          discount_type: formData.discount_type,
-          discount_value: currentDiscountValue,
-          next_payment_date: formData.next_payment_date,
+        const paymentInfo = {
+          user_id: user.id, member_id: member[0].id, amount: currentPaidAmount,
+          payment_mode: formData.payment_mode, payment_date: formData.joining_date,
+          plan_price: currentPlanPrice, discount_type: formData.discount_type,
+          discount_value: currentDiscountValue, next_payment_date: formData.next_payment_date,
           notes: "Initial registration payment"
-        }]);
+        };
+        const { error: pError } = await supabase.from("payments").insert([paymentInfo]);
         if (pError) throw pError;
+
+        // ✅ Step 1: Generate PDF
+        generateInvoice(member[0], paymentInfo);
+        
+        // ✅ Step 2: Send WhatsApp
+        sendWhatsAppWelcome(member[0], currentPaidAmount, formData.next_payment_date);
       }
 
-      alert("Member & Payment recorded successfully! 🎉");
+      alert("Success! Member registered, Invoice saved & WhatsApp opened 🎉");
       setFormData({ ...formData, name: "", whatsapp: "", email: "", gender: "", paid_amount: 0, discount_value: 0 });
-      fetchMembers();
-      fetchPayments(); 
+      fetchMembers(); fetchPayments(); 
     } catch (err) {
       alert("Error: " + err.message);
     } finally {
@@ -169,7 +212,6 @@ function AddMember() {
   return (
     <div className="p-3 md:p-8 space-y-8 md:space-y-12 animate-in fade-in duration-500 overflow-x-hidden">
       <div className="max-w-6xl mx-auto bg-white rounded-[24px] md:rounded-[32px] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden transition-all">
-        {/* Header */}
         <div className="bg-slate-900 p-6 md:p-8 text-white flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
           <div className="flex flex-col md:flex-row items-center gap-4">
             <div className="w-12 h-12 md:w-14 md:h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/40">
@@ -187,7 +229,6 @@ function AddMember() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 md:p-12 space-y-8 md:space-y-10">
-          {/* Personal Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
               <User className="text-blue-600" size={18} />
@@ -201,7 +242,6 @@ function AddMember() {
                   onChange={(e) => setFormData({...formData, name: e.target.value})} />
               </div>
 
-              {/* ✅ 3. Added Email Field here */}
               <div className="md:col-span-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Email Address</label>
                 <div className="relative">
@@ -213,14 +253,22 @@ function AddMember() {
 
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Phone (Intl.)</label>
-                <PhoneInput
-                  international
-                  defaultCountry={userCountry}
-                  value={formData.whatsapp}
-                  onChange={(val) => setFormData({...formData, whatsapp: val})}
-                  className="global-phone-input-container"
-                />
+                {isReady ? (
+                   <PhoneInput
+                    key={userCountry}
+                    international
+                    defaultCountry={userCountry}
+                    value={formData.whatsapp}
+                    onChange={(val) => setFormData({...formData, whatsapp: val})}
+                    className="global-phone-input-container"
+                  />
+                ) : (
+                  <div className="h-[52px] md:h-[58px] w-full bg-slate-50 border border-slate-200 rounded-2xl animate-pulse flex items-center px-4 italic text-slate-400 text-[10px] font-bold">
+                    Setting up region...
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Gender</label>
                 <select className="w-full px-5 py-3 md:py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 font-bold appearance-none cursor-pointer" required value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
@@ -233,10 +281,6 @@ function AddMember() {
             </div>
           </div>
           
-          {/* ... Baki ka code same rahega ... */}
-          {/* Membership Info, Pricing Section, Footer Actions, Tables Section as per your original code */}
-          
-          {/* I am keeping the rest of your UI elements exactly as they were in your prompt */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
               <Calendar className="text-emerald-600" size={18} />
@@ -328,8 +372,6 @@ function AddMember() {
           </div>
         </form>
       </div>
-      {/* Tables section remain the same as your code */}
-      {/* ... Recent Joinees & Payment Log tables ... */}
     </div>
   );
 }

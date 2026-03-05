@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-// ✅ Global utility import ki
 import { formatCurrency } from "../../lib/utils"; 
-import { UserPlus, Phone, Loader2, Edit2, Trash2, Eye, X, Save, ShieldCheck, CreditCard, Zap } from "lucide-react";
+import { UserPlus, Phone, Loader2, Edit2, Trash2, Eye, X, Save, ShieldCheck, CreditCard, Zap, CheckCircle } from "lucide-react";
 
 function Trainers() {
   const [trainers, setTrainers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(null); 
+  const [attLoading, setAttLoading] = useState(null); // ✅ Attendance loading state
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [modalType, setModalType] = useState(null);
 
@@ -19,7 +19,6 @@ function Trainers() {
     salary: "",
   });
 
-  // 🌍 Dynamic Currency Symbol nikalne ke liye (Label ke liye)
   const currencySymbol = formatCurrency(0).replace(/[0-9.,\s]/g, '');
 
   useEffect(() => {
@@ -40,13 +39,46 @@ function Trainers() {
     else setTrainers(data || []);
   }
 
+  // ✅ NEW: Attendance Mark karne ka function
+  async function markTrainerAttendance(trainer) {
+    try {
+      setAttLoading(trainer.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      const today = new Date().toISOString().split('T')[0];
+
+      // Check if already marked
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('trainer_id', trainer.id)
+        .eq('type', 'trainer')
+        .gte('created_at', `${today}T00:00:00`);
+
+      if (existing?.length > 0) {
+        alert(`${trainer.name} ki attendance aaj pehle hi lag chuki hai! 💪`);
+        return;
+      }
+
+      const { error } = await supabase.from('attendance').insert([{
+        user_id: user.id,
+        trainer_id: trainer.id,
+        type: 'trainer'
+      }]);
+
+      if (error) throw error;
+      alert(`${trainer.name} Checked-in successfully! 🔥`);
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setAttLoading(null);
+    }
+  }
+
+  // ... (recordSalaryPayment, handleSubmit, handleDelete, handleUpdate functions remain exactly the same)
   async function recordSalaryPayment(trainer) {
-    // ✅ Alert mein bhi formatted currency dikhegi
     if (!window.confirm(`Record ${formatCurrency(trainer.salary)} as salary expense for ${trainer.name}?`)) return;
-    
     setPayLoading(trainer.id);
     const { data: { user } } = await supabase.auth.getUser();
-
     const expensePayload = {
       title: `Salary: ${trainer.name}`,
       amount: parseFloat(trainer.salary),
@@ -55,14 +87,8 @@ function Trainers() {
       user_id: user.id,
       notes: `Staff ID: ${trainer.id} | Phone: ${trainer.phone}`
     };
-
     const { error } = await supabase.from("expenses").insert([expensePayload]);
-
-    if (error) {
-      alert("Error recording expense: " + error.message);
-    } else {
-      console.log("Salary recorded");
-    }
+    if (error) alert("Error recording expense: " + error.message);
     setPayLoading(null);
   }
 
@@ -70,18 +96,10 @@ function Trainers() {
     e.preventDefault();
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    
-    const payload = { 
-      ...form, 
-      salary: parseFloat(form.salary),
-      user_id: user.id 
-    };
-
+    const payload = { ...form, salary: parseFloat(form.salary), user_id: user.id };
     const { error } = await supabase.from("trainers").insert([payload]);
-
-    if (error) {
-      alert("Error: " + error.message);
-    } else {
+    if (error) alert("Error: " + error.message);
+    else {
       setForm({ name: "", phone: "", specialty: "", salary: "" });
       setShowForm(false);
       fetchTrainers();
@@ -92,11 +110,7 @@ function Trainers() {
   async function handleDelete(id) {
     if (window.confirm("Are you sure you want to remove this trainer?")) {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("trainers")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id); 
-      
+      const { error } = await supabase.from("trainers").delete().eq("id", id).eq("user_id", user.id); 
       if (error) alert(error.message);
       else fetchTrainers();
     }
@@ -106,30 +120,20 @@ function Trainers() {
     e.preventDefault();
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-
-    const { error } = await supabase
-      .from("trainers")
-      .update({
-        name: selectedTrainer.name,
-        phone: selectedTrainer.phone,
-        specialty: selectedTrainer.specialty,
-        salary: parseFloat(selectedTrainer.salary)
-      })
-      .eq("id", selectedTrainer.id)
-      .eq("user_id", user.id);
-
-    if (error) {
-      alert(error.message);
-    } else {
-      setModalType(null);
-      fetchTrainers();
-    }
+    const { error } = await supabase.from("trainers").update({
+      name: selectedTrainer.name,
+      phone: selectedTrainer.phone,
+      specialty: selectedTrainer.specialty,
+      salary: parseFloat(selectedTrainer.salary)
+    }).eq("id", selectedTrainer.id).eq("user_id", user.id);
+    if (error) alert(error.message);
+    else { setModalType(null); fetchTrainers(); }
     setLoading(false);
   }
 
   return (
     <div className="bg-white p-4 md:p-8 rounded-[32px] shadow-xl shadow-slate-100 border border-slate-100 animate-in fade-in duration-500 max-w-7xl mx-auto">
-      {/* Header Section */}
+      {/* Header Section (Unchanged) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
         <div>
           <h3 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight flex items-center gap-2">
@@ -147,7 +151,7 @@ function Trainers() {
         </button>
       </div>
 
-      {/* Add Trainer Form */}
+      {/* Add Trainer Form (Unchanged) */}
       {showForm && (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12 p-6 md:p-8 bg-slate-50 rounded-[24px] border-2 border-dashed border-slate-200 animate-in slide-in-from-top-4">
           <div className="space-y-1">
@@ -163,7 +167,6 @@ function Trainers() {
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 font-medium" placeholder="e.g. Yoga, HIIT" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} required />
           </div>
           <div className="space-y-1">
-            {/* ✅ Label updated with dynamic currency symbol */}
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Salary ({currencySymbol})</label>
             <input className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 font-bold" placeholder="Salary" type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} required />
           </div>
@@ -183,6 +186,16 @@ function Trainers() {
             style={{ animationDelay: `${index * 50}ms` }}
             className="group flex flex-col p-6 border border-slate-100 rounded-[28px] hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-50 transition-all bg-white relative animate-in fade-in slide-in-from-bottom-2"
           >
+            {/* ✅ Attendance Quick Button Added at top-right */}
+            <button 
+              onClick={() => markTrainerAttendance(trainer)}
+              disabled={attLoading === trainer.id}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 hover:bg-emerald-500 hover:text-white transition-all active:scale-90"
+              title="Mark Today's Attendance"
+            >
+              {attLoading === trainer.id ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle size={16}/>}
+            </button>
+
             <div className="flex justify-between items-start mb-6">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-lg font-black italic shadow-lg group-hover:bg-blue-600 transition-colors">
@@ -203,7 +216,6 @@ function Trainers() {
               <div className="flex items-center justify-between">
                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monthly Salary</span>
                  <div className="flex items-center gap-1 font-black text-blue-600 italic text-xl tracking-tighter">
-                   {/* ✅ Salary format updated */}
                    {formatCurrency(trainer.salary)}
                  </div>
               </div>
@@ -215,7 +227,6 @@ function Trainers() {
                   onClick={() => recordSalaryPayment(trainer)}
                   disabled={payLoading === trainer.id}
                   className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-tighter hover:bg-emerald-600 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                  title="Push to Expenses"
                 >
                   {payLoading === trainer.id ? <Loader2 className="animate-spin" size={12}/> : <CreditCard size={12}/>}
                   Pay Salary
@@ -241,12 +252,11 @@ function Trainers() {
                 <ShieldCheck className="text-slate-200" size={32} />
               </div>
               <p className="text-slate-500 font-black uppercase text-sm tracking-widest">No Professional Staff Found</p>
-              <p className="text-slate-400 text-[10px] uppercase font-bold mt-1 tracking-tight">Hire trainers to start managing your gym's expertise</p>
           </div>
         )}
       </div>
 
-      {/* Modern Modal Section */}
+      {/* Modern Modal Section (Unchanged logic) */}
       {modalType && selectedTrainer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[40px] w-full max-w-md p-8 shadow-2xl relative animate-in zoom-in-95 duration-200">
@@ -273,7 +283,6 @@ function Trainers() {
                   <input disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold uppercase" value={selectedTrainer.specialty} onChange={(e) => setSelectedTrainer({...selectedTrainer, specialty: e.target.value})} />
                 </div>
                 <div className="space-y-1">
-                  {/* ✅ Modal Salary label updated */}
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Salary ({currencySymbol})</label>
                   <input type="number" disabled={modalType === 'view'} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-black text-blue-600" value={selectedTrainer.salary} onChange={(e) => setSelectedTrainer({...selectedTrainer, salary: e.target.value})} />
                 </div>
