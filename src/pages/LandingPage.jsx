@@ -3,7 +3,8 @@ import {
   Dumbbell, CheckCircle2, Star, Zap, 
   Shield, Smartphone, Users, ChevronRight,
   Instagram, Twitter, Facebook,
-  ArrowRight, Award, Flame, Bell, Mail, Send, Sparkles, ShieldCheck
+  ArrowRight, Award, Flame, Bell, Mail, Send, Sparkles, ShieldCheck,
+  IndianRupee // ✅ Added IndianRupee icon
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -12,7 +13,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
   
-  // Defaulting to ₹ INR to ensure it shows first
+  // ✅ FIX: Strict Default to ₹ INR
   const [currency, setCurrency] = useState({ symbol: "₹", code: "INR", locale: "en-IN" });
   const [trialLoading, setTrialLoading] = useState(false);
 
@@ -30,20 +31,23 @@ export default function LandingPage() {
       try {
         const isIndianTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Kolkata';
         
-        // Agar India hai toh ₹ hi rakho
+        // Agar India timezone hai toh loop se bahar aa jao, ₹ hi rahega
         if (isIndianTimezone) {
           setCurrency({ symbol: "₹", code: "INR", locale: "en-IN" });
           return;
         }
 
-        // Sirf tab change karo jab confirm ho jaye ki bahar ka user hai
+        // External check sirf non-IST users ke liye
         const res = await fetch("https://ipapi.co/json/");
         const data = await res.json();
         if (data.country_code && data.country_code !== 'IN') {
           setCurrency({ symbol: "$", code: "USD", locale: "en-US" });
+        } else {
+          setCurrency({ symbol: "₹", code: "INR", locale: "en-IN" });
         }
       } catch (err) {
-        console.log("Defaulting to INR");
+        console.log("Location detection failed, keeping INR");
+        setCurrency({ symbol: "₹", code: "INR", locale: "en-IN" });
       }
     };
     
@@ -135,6 +139,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
             <Sparkles size={14} /> FOUNDER'S OFFER: FIRST 1,000 GYMS ONLY
           </div>
+          {/* ✅ FIXED: Currency Symbol for Hero */}
           <h1 className="text-6xl md:text-9xl font-black italic uppercase tracking-tighter leading-[0.85] text-slate-900">
             Professional <br /> <span className="text-blue-600">For {currency.symbol}0.</span>
           </h1>
@@ -171,6 +176,7 @@ export default function LandingPage() {
             </div>
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 text-center">
               <p className="text-blue-400 font-black uppercase tracking-widest text-[10px] mb-2">Lifetime Price for Early Adopters</p>
+              {/* ✅ FIXED: Currency Symbol for Pricing */}
               <div className="text-8xl font-black italic mb-4">{currency.symbol}0</div>
               <button onClick={handleStartTrial} className="w-full bg-white text-slate-900 py-4 rounded-2xl font-black uppercase italic tracking-widest hover:bg-blue-400 hover:text-white transition-all">Claim Now</button>
             </div>
@@ -178,6 +184,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* --- Remaining sections (Features, Contact, Footer) same as original... --- */}
+      {/* ... */}
+      
       {/* --- Features Grid --- */}
       <section id="features" className="py-32 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-6">
